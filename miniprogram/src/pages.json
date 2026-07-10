@@ -1,0 +1,39 @@
+{
+  "pages": [
+    { "path": "pages/login/login", "style": { "navigationBarTitleText": "登录", "navigationStyle": "custom" } },
+    { "path": "pages/index/index", "style": { "navigationBarTitleText": "智慧医养" } },
+    { "path": "pages/archive/archive", "style": { "navigationBarTitleText": "健康档案" } },
+    { "path": "pages/points/points", "style": { "navigationBarTitleText": "积分中心" } },
+    { "path": "pages/account/account", "style": { "navigationBarTitleText": "我的" } },
+
+    { "path": "pages/health/profileEdit", "style": { "navigationBarTitleText": "基本信息" } },
+    { "path": "pages/health/metric", "style": { "navigationBarTitleText": "体征数据" } },
+    { "path": "pages/health/medical", "style": { "navigationBarTitleText": "就诊记录" } },
+    { "path": "pages/health/report", "style": { "navigationBarTitleText": "健康报告" } },
+
+    { "path": "pages/point/record", "style": { "navigationBarTitleText": "积分明细" } },
+    { "path": "pages/doctor/doctor", "style": { "navigationBarTitleText": "医生专家库" } },
+    { "path": "pages/consult/consult", "style": { "navigationBarTitleText": "健康咨询" } },
+    { "path": "pages/alert/alert", "style": { "navigationBarTitleText": "健康预警" } },
+
+    { "path": "pages/account/edit", "style": { "navigationBarTitleText": "编辑资料" } },
+    { "path": "pages/account/password", "style": { "navigationBarTitleText": "修改密码" } }
+  ],
+  "tabBar": {
+    "color": "#9AA6A0",
+    "selectedColor": "#2FA37C",
+    "backgroundColor": "#FFFFFF",
+    "borderStyle": "white",
+    "list": [
+      { "pagePath": "pages/index/index", "text": "首页" },
+      { "pagePath": "pages/archive/archive", "text": "档案" },
+      { "pagePath": "pages/points/points", "text": "积分" },
+      { "pagePath": "pages/account/account", "text": "我的" }
+    ]
+  },
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarBackgroundColor": "#F1EFE7",
+    "backgroundColor": "#F1EFE7"
+  }
+}
