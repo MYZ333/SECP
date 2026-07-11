@@ -70,7 +70,7 @@ function scroll() { nextTick(() => { if (msgBox.value) msgBox.value.scrollTop = 
   display: flex; align-items: center; gap: 12px; padding: 18px 24px;
   border-bottom: 1px solid var(--hda-line);
 }
-.bot { width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; color: #fff;
+.bot { width: 46px; height: 46px; border-radius: 0; display: grid; place-items: center; color: #fff;
   background: linear-gradient(135deg, #37B389, #279470); animation: hdaFloat 5s ease-in-out infinite; }
 .bot-name { font-weight: 700; font-size: 18px; color: var(--hda-ink); font-family: var(--hda-font-display); }
 .bot-sub { font-size: 14px; color: var(--hda-ink-soft); display: flex; align-items: center; gap: 6px; }
@@ -80,10 +80,10 @@ function scroll() { nextTick(() => { if (msgBox.value) msgBox.value.scrollTop = 
 .messages { flex: 1; overflow-y: auto; padding: 22px 24px; }
 .msg { display: flex; align-items: flex-end; gap: 10px; margin: 14px 0; }
 .msg.user { justify-content: flex-end; }
-.face { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; flex-shrink: 0;
+.face { width: 38px; height: 38px; border-radius: 0; display: grid; place-items: center; flex-shrink: 0;
   background: var(--el-color-primary-light-8); color: var(--el-color-primary); }
 .bubble {
-  max-width: 68%; padding: 14px 18px; border-radius: 18px; font-size: 17px; line-height: 1.65;
+  max-width: 68%; padding: 14px 18px; border-radius: 0; font-size: 17px; line-height: 1.65;
   background: #F3F1EA; color: var(--hda-ink); border-bottom-left-radius: 6px;
   box-shadow: var(--hda-shadow-sm);
 }
@@ -110,7 +110,7 @@ function scroll() { nextTick(() => { if (msgBox.value) msgBox.value.scrollTop = 
 .hello h3 { font-family: var(--hda-font-display); font-size: 24px; color: var(--hda-ink); margin: 0 0 22px; }
 .samples { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
 .samples span {
-  padding: 12px 20px; border-radius: 999px; background: #fff; cursor: pointer; font-size: 16px;
+  padding: 12px 20px; border-radius: 0; background: #fff; cursor: pointer; font-size: 16px;
   box-shadow: inset 0 0 0 1.5px var(--el-color-primary-light-7); color: var(--hda-ink);
   transition: transform .22s var(--ease-spring), box-shadow .25s, color .25s;
 }

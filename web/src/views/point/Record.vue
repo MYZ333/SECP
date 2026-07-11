@@ -7,7 +7,7 @@
           <el-table-column prop="type" label="类型" />
           <el-table-column prop="description" label="描述" />
           <el-table-column label="变动"><template #default="{ row }">
-            <span :style="{ color: row.changePoints >= 0 ? '#67c23a' : '#f56c6c' }">
+            <span :style="{ color: row.changePoints >= 0 ? '#2FA37C' : '#E5654B', fontWeight: 600 }">
               {{ row.changePoints >= 0 ? '+' : '' }}{{ row.changePoints }}</span>
           </template></el-table-column>
           <el-table-column prop="balance" label="余额" />

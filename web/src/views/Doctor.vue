@@ -43,7 +43,7 @@ onMounted(load)
 .search-bar { display: flex; gap: 12px; margin-bottom: 22px; }
 .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
 .doc {
-  background: var(--hda-card); border-radius: 20px; padding: 22px;
+  background: var(--hda-card); border-radius: 0; padding: 22px;
   box-shadow: var(--hda-shadow-sm); transition: transform .3s cubic-bezier(.2,.8,.2,1), box-shadow .3s;
   border-top: 4px solid var(--el-color-primary);
 }
@@ -55,7 +55,7 @@ onMounted(load)
 .place { color: var(--hda-ink-soft); font-size: 15px; margin-top: 4px; }
 .spec { margin: 16px 0 8px; font-size: 15px; color: var(--hda-ink); }
 .spec .k { display: inline-block; background: var(--el-color-primary-light-9); color: var(--el-color-primary);
-  font-weight: 600; padding: 2px 10px; border-radius: 8px; margin-right: 8px; font-size: 13px; }
+  font-weight: 600; padding: 2px 10px; border-radius: 0; margin-right: 8px; font-size: 13px; }
 .intro { color: var(--hda-ink-soft); font-size: 14px; line-height: 1.6; margin: 0;
   display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .pager { display: flex; justify-content: center; margin-top: 26px; }
