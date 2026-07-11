@@ -104,7 +104,7 @@ onMounted(async () => {
 /* 欢迎横幅 */
 .hero {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 40px 44px; border-radius: 28px; overflow: hidden; position: relative;
+  padding: 40px 44px; border-radius: 0; overflow: hidden; position: relative;
   background: #ffffff; box-shadow: var(--hda-shadow);
 }
 .hero-text { position: relative; z-index: 2; }
@@ -113,12 +113,12 @@ onMounted(async () => {
 .hero-text h1 .hl { color: var(--el-color-primary); position: relative; }
 .hero-text h1 .hl::after {
   content: ""; position: absolute; left: 0; right: 0; bottom: 4px; height: 10px;
-  background: var(--el-color-primary-light-7); z-index: -1; border-radius: 4px;
+  background: var(--el-color-primary-light-7); z-index: -1; border-radius: 0;
 }
 .hero-text .sub { font-size: 16px; color: var(--hda-ink-soft); margin: 0 0 22px; }
 .chips { display: flex; gap: 12px; }
 .chip {
-  padding: 10px 20px; border-radius: 999px; font-size: 16px; font-weight: 600; cursor: pointer;
+  padding: 10px 20px; border-radius: 0; font-size: 16px; font-weight: 600; cursor: pointer;
   background: var(--el-color-primary); color: #fff; transition: transform .22s var(--ease-spring), box-shadow .25s;
   box-shadow: 0 8px 18px rgba(47,163,124,.28);
 }
@@ -139,12 +139,12 @@ onMounted(async () => {
 .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
 .stat {
   position: relative; overflow: hidden; display: flex; align-items: center; gap: 16px;
-  background: var(--hda-card); border-radius: 22px; padding: 24px;
+  background: var(--hda-card); border-radius: 0; padding: 24px;
   box-shadow: var(--hda-shadow-sm); transition: transform .4s var(--ease-out), box-shadow .4s var(--ease-out);
 }
 .stat:hover { transform: translateY(-6px); box-shadow: var(--hda-shadow); }
 .stat .ic {
-  width: 60px; height: 60px; border-radius: 18px; display: grid; place-items: center;
+  width: 60px; height: 60px; border-radius: 0; display: grid; place-items: center;
   color: var(--c); background: color-mix(in srgb, var(--c) 14%, white);
 }
 .stat .num { font-size: 34px; font-weight: 800; color: var(--hda-ink); line-height: 1.05; }
@@ -159,13 +159,13 @@ onMounted(async () => {
 .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; perspective: 900px; }
 .tile {
   position: relative; display: flex; align-items: center; gap: 16px;
-  background: var(--hda-card); border-radius: 20px; padding: 24px;
+  background: var(--hda-card); border-radius: 0; padding: 24px;
   box-shadow: var(--hda-shadow-sm); cursor: pointer; transform-style: preserve-3d;
   transition: transform .3s var(--ease-out), box-shadow .3s;
 }
 .tile:hover { box-shadow: var(--hda-shadow); }
 .tile-ic {
-  width: 58px; height: 58px; border-radius: 17px; display: grid; place-items: center; color: #fff;
+  width: 58px; height: 58px; border-radius: 0; display: grid; place-items: center; color: #fff;
   background: var(--c); box-shadow: 0 10px 20px color-mix(in srgb, var(--c) 42%, transparent);
 }
 .tile-name { font-size: 19px; font-weight: 600; color: var(--hda-ink); }

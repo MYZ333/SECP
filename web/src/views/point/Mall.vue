@@ -74,14 +74,14 @@ onMounted(load)
 
 .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
 .prod {
-  background: var(--hda-card); border-radius: 20px; overflow: hidden;
+  background: var(--hda-card); border-radius: 0; overflow: hidden;
   box-shadow: var(--hda-shadow-sm); transition: transform .3s cubic-bezier(.2,.8,.2,1), box-shadow .3s;
 }
 .prod:hover { transform: translateY(-6px); box-shadow: var(--hda-shadow); }
 .cover { position: relative; height: 150px; background: #F4F8F5; }
 .badge {
   position: absolute; top: 12px; left: 12px; background: rgba(255,255,255,.92);
-  color: var(--hda-accent); font-weight: 700; padding: 4px 12px; border-radius: 999px; font-size: 14px;
+  color: var(--hda-accent); font-weight: 700; padding: 4px 12px; border-radius: 0; font-size: 14px;
 }
 .img-ph { width: 100%; height: 100%; display: grid; place-items: center; color: #B9C9C1; }
 .body { padding: 16px 18px 18px; }

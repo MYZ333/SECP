@@ -1,43 +1,42 @@
 /* ============================================================
-   智慧医养 · 温暖健康风 v2 设计系统
-   融合 Linear/Stripe 的精致排版与动效，适配老人（大字/高对比）
-   —— 负字距展示标题 · 等宽数字 · 渐变网格 · 弹性缓动 · 滚动揭示
+   智慧医养 · 浅色医疗高级感 v3 设计系统
+   白 / 浅蓝底 · 玻璃拟态 · 柔和渐变光晕 · 冷调蓝主色
+   排版：Sora 展示字体 + 负字距 · 等宽数字 · 极光背景 · 弹性缓动
    ============================================================ */
 
-/* 展示字体：Sora（几何、友好、非 Inter 烂大街），正文用中文系统字体 */
 @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&display=swap');
 
 :root {
-  /* —— 品牌主色：温暖青绿 —— */
-  --el-color-primary: #2FA37C;
-  --el-color-primary-light-3: #6DBFA3;
-  --el-color-primary-light-5: #97D1BE;
-  --el-color-primary-light-7: #C1E3D8;
-  --el-color-primary-light-8: #D5EDE5;
-  --el-color-primary-light-9: #EAF6F2;
-  --el-color-primary-dark-2: #268263;
+  /* —— 品牌主色：医疗蓝 —— */
+  --el-color-primary: #2E6FE0;
+  --el-color-primary-light-3: #6D9BEB;
+  --el-color-primary-light-5: #96B7F1;
+  --el-color-primary-light-7: #C0D4F7;
+  --el-color-primary-light-8: #D5E2FA;
+  --el-color-primary-light-9: #EAF1FC;
+  --el-color-primary-dark-2: #2458B8;
 
-  --el-color-success: #37A86B;
+  --el-color-success: #2FA37C;
   --el-color-warning: #E8933B;
   --el-color-danger:  #E5654B;
   --el-color-error:   #E5654B;
-  --el-color-info:    #8A9B93;
+  --el-color-info:    #8494A7;
 
-  /* —— 暖色中性 —— */
-  --hda-bg:        #F1EFE7;
-  --hda-bg-soft:   #F7F5EF;
+  /* —— 冷调中性 —— */
+  --hda-bg:        #EFF4FA;
+  --hda-bg-soft:   #F7FAFD;
   --hda-card:      #FFFFFF;
-  --hda-ink:       #21362E;
-  --hda-ink-soft:  #5B6B63;
-  --hda-line:      #E6E1D5;
-  --hda-accent:    #F2955E;
-  --hda-accent-2:  #7BC6A6;
+  --hda-ink:       #16283E;
+  --hda-ink-soft:  #5D7189;
+  --hda-line:      #DFE7F2;
+  --hda-accent:    #2E6FE0;   /* 单一强调色 */
+  --hda-accent-2:  #37B6D9;   /* 仅用于渐变过渡，不单独出现 */
   --hda-gold:      #E3A93C;
 
-  --el-text-color-primary: #21362E;
-  --el-text-color-regular: #46564E;
-  --el-border-color: #E6E1D5;
-  --el-border-color-light: #EFEBE1;
+  --el-text-color-primary: #16283E;
+  --el-text-color-regular: #3F5470;
+  --el-border-color: #DFE7F2;
+  --el-border-color-light: #E9EFF7;
   --el-fill-color-blank: #FFFFFF;
   --el-bg-color: #FFFFFF;
 
@@ -48,17 +47,22 @@
   --el-component-size-large: 48px;
   --el-component-size: 42px;
 
-  /* —— 圆润 & 暖色阴影（分层、带色）—— */
-  --el-border-radius-base: 12px;
-  --el-border-radius-small: 10px;
-  --hda-radius-lg: 24px;
-  --hda-shadow-sm: 0 2px 8px rgba(33,80,63,.05), 0 8px 22px rgba(33,80,63,.06);
-  --hda-shadow:    0 6px 16px rgba(33,80,63,.08), 0 18px 40px rgba(33,80,63,.10);
-  --hda-shadow-lg: 0 12px 28px rgba(33,80,63,.12), 0 30px 70px rgba(33,80,63,.16);
+  /* —— 圆润 & 冷调蓝阴影（分层、带色）—— */
+  --el-border-radius-base: 0;
+  --el-border-radius-small: 0;
+  --hda-radius-lg: 0;
+  --hda-shadow-sm: 0 2px 8px rgba(28,63,120,.05), 0 8px 22px rgba(28,63,120,.06);
+  --hda-shadow:    0 6px 16px rgba(28,63,120,.08), 0 18px 40px rgba(28,63,120,.10);
+  --hda-shadow-lg: 0 12px 28px rgba(28,63,120,.12), 0 30px 70px rgba(28,63,120,.16);
+
+  /* —— 玻璃拟态（真·玻璃：模糊 + 1px 内边 + 内阴影折射感）—— */
+  --hda-glass-bg: rgba(255,255,255,.72);
+  --hda-glass-border: 1px solid rgba(255,255,255,.65);
+  --hda-glass-inner: inset 0 1px 0 rgba(255,255,255,.9), inset 0 -1px 0 rgba(28,63,120,.04);
 
   /* —— 弹性缓动令牌 —— */
-  --ease-spring: cubic-bezier(.34, 1.56, .64, 1);   /* 回弹 */
-  --ease-out:    cubic-bezier(.22, 1, .36, 1);       /* 顺滑减速 */
+  --ease-spring: cubic-bezier(.34, 1.56, .64, 1);
+  --ease-out:    cubic-bezier(.22, 1, .36, 1);
   --ease-inout:  cubic-bezier(.65, 0, .35, 1);
 
   --hda-font-display: "Sora", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
@@ -82,7 +86,7 @@ body {
 * { box-sizing: border-box; }
 ::selection { background: var(--el-color-primary-light-7); color: var(--hda-ink); }
 
-/* 展示标题：Sora + 负字距（Linear 手法，克制以保可读） */
+/* 展示标题：Sora + 负字距 */
 h1, h2, .hda-display {
   font-family: var(--hda-font-display);
   letter-spacing: -0.02em;
@@ -91,41 +95,43 @@ h1, h2, .hda-display {
 }
 h1 { letter-spacing: -0.035em; }
 
-/* 所有数字：等宽 + tabular（Stripe 金融级手法） */
+/* 所有数字：等宽 + tabular */
 .num, .el-statistic__number, .stat .num, .pt-num, table td .cell {
   font-family: var(--hda-font-display);
   font-feature-settings: "tnum", "ss01";
   font-variant-numeric: tabular-nums;
 }
 
-/* —— 卡片 —— */
+/* —— 卡片：白玻璃 —— */
 .el-card {
-  border: none !important;
+  border: var(--hda-glass-border) !important;
   border-radius: var(--hda-radius-lg) !important;
-  box-shadow: var(--hda-shadow-sm) !important;
-  background: var(--hda-card);
+  box-shadow: var(--hda-shadow-sm), var(--hda-glass-inner) !important;
+  background: var(--hda-glass-bg);
+  backdrop-filter: blur(14px);
   transition: transform .4s var(--ease-out), box-shadow .4s var(--ease-out);
 }
-.el-card:hover { box-shadow: var(--hda-shadow) !important; }
+.el-card:hover { box-shadow: var(--hda-shadow), var(--hda-glass-inner) !important; }
 .el-card__header { border-bottom: 1px solid var(--hda-line); font-weight: 600; font-size: 18px; }
 
-/* —— 按钮：大、圆、弹性反馈、光泽扫过 —— */
+/* —— 按钮：大、圆、弹性反馈 —— */
 .el-button {
-  border-radius: 999px; font-weight: 600; letter-spacing: .02em;
+  border-radius: 0; font-weight: 600; letter-spacing: .02em;
   transition: transform .22s var(--ease-spring), box-shadow .25s ease, background-color .25s ease;
 }
 .el-button--large { padding: 14px 26px; font-size: 17px; }
 .el-button:not(.is-text):not(.is-link):hover { transform: translateY(-2px); }
 .el-button:not(.is-text):not(.is-link):active { transform: translateY(0) scale(.96); }
 .el-button--primary {
-  background: linear-gradient(135deg, #37B389, #2FA37C 60%, #279470);
-  border: none; box-shadow: 0 8px 20px rgba(47,163,124,.30);
+  background: linear-gradient(135deg, #3E86EC, #2E6FE0 60%, #2458B8);
+  border: none; box-shadow: 0 8px 20px rgba(46,111,224,.30);
 }
-.el-button--primary:hover { box-shadow: 0 14px 30px rgba(47,163,124,.40); }
+.el-button--primary:hover { box-shadow: 0 14px 30px rgba(46,111,224,.40); }
+.el-button--primary:focus-visible { outline: 3px solid var(--el-color-primary-light-7); outline-offset: 2px; }
 
 /* —— 输入框 —— */
 .el-input__wrapper, .el-textarea__inner {
-  border-radius: 12px; box-shadow: 0 0 0 1px var(--hda-line) inset;
+  border-radius: 0; box-shadow: 0 0 0 1px var(--hda-line) inset;
   transition: box-shadow .28s var(--ease-out), background-color .25s ease;
 }
 .el-input__wrapper:hover { box-shadow: 0 0 0 1px var(--el-color-primary-light-5) inset; }
@@ -134,18 +140,18 @@ h1 { letter-spacing: -0.035em; }
 
 /* —— 表格 —— */
 .el-table {
-  border-radius: 16px; overflow: hidden; font-size: 16px;
-  --el-table-header-bg-color: #F3F8F5;
-  --el-table-row-hover-bg-color: #EEF8F2;
-  --el-table-border-color: #ECE8DE;
+  border-radius: 0; overflow: hidden; font-size: 16px;
+  --el-table-header-bg-color: #F2F7FD;
+  --el-table-row-hover-bg-color: #EDF4FC;
+  --el-table-border-color: #E5EBF4;
 }
 .el-table th.el-table__cell { color: var(--hda-ink); font-weight: 600; }
 .el-table .cell { padding: 6px 12px; }
 .el-table__row { transition: background-color .2s ease; }
 
-.el-tag { border-radius: 8px; font-weight: 600; }
-.el-pagination.is-background .el-pager li { border-radius: 10px; }
-.el-dialog { border-radius: 24px; overflow: hidden; box-shadow: var(--hda-shadow-lg); }
+.el-tag { border-radius: 0; font-weight: 600; }
+.el-pagination.is-background .el-pager li { border-radius: 0; }
+.el-dialog { border-radius: 0; overflow: hidden; box-shadow: var(--hda-shadow-lg); }
 .el-dialog__header { font-weight: 700; font-family: var(--hda-font-display); }
 .el-descriptions { font-size: 16px; }
 .el-descriptions__label { color: var(--hda-ink-soft); font-weight: 600; }
@@ -153,19 +159,30 @@ h1 { letter-spacing: -0.035em; }
 .el-overlay-dialog .el-dialog { animation: hdaPop .4s var(--ease-spring) both; }
 
 /* ============================================================
-   工具：渐变网格背景（Stripe 手法）+ 颗粒
+   工具：极光渐变背景（冷调蓝青）+ 颗粒
    ============================================================ */
 .hda-mesh { position: relative; isolation: isolate; }
 .hda-mesh::before {
   content: ""; position: absolute; inset: 0; z-index: -1; opacity: .9;
   background:
-    radial-gradient(40% 55% at 12% 8%, rgba(123,198,166,.55), transparent 60%),
-    radial-gradient(38% 50% at 88% 4%, rgba(246,195,154,.50), transparent 62%),
-    radial-gradient(45% 60% at 60% 100%, rgba(159,217,193,.45), transparent 60%);
+    radial-gradient(40% 55% at 12% 8%, rgba(110,160,240,.45), transparent 60%),
+    radial-gradient(38% 50% at 88% 4%, rgba(84,196,224,.38), transparent 62%),
+    radial-gradient(45% 60% at 60% 100%, rgba(150,183,241,.40), transparent 60%);
 }
 .hda-grain::after {
   content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 0; opacity: .05;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* —— 环境光斑：固定在视口的柔和光晕（内页氛围）—— */
+.hda-ambient { position: relative; }
+.hda-ambient::before {
+  content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(46% 38% at 8% -6%, rgba(110,160,240,.20), transparent 62%),
+    radial-gradient(40% 34% at 104% 12%, rgba(84,196,224,.14), transparent 60%),
+    radial-gradient(52% 42% at 50% 112%, rgba(150,183,241,.16), transparent 62%);
+  animation: hdaDrift 26s ease-in-out infinite;
 }
 
 /* ============================================================
@@ -178,6 +195,7 @@ h1 { letter-spacing: -0.035em; }
 @keyframes hdaSpin   { to { transform: rotate(360deg) } }
 @keyframes hdaShimmer{ 0%{ background-position:-160% 0 } 100%{ background-position:260% 0 } }
 @keyframes hdaDrift  { 0%,100%{ transform:translate3d(0,0,0) scale(1) } 33%{ transform:translate3d(3%,-4%,0) scale(1.08) } 66%{ transform:translate3d(-3%,3%,0) scale(1.04) } }
+@keyframes hdaEcg    { to { stroke-dashoffset: 0 } }
 
 .hda-enter { animation: hdaFadeUp .6s var(--ease-out) both; }
 .hda-stagger > * { animation: hdaFadeUp .6s var(--ease-out) both; }
@@ -200,11 +218,19 @@ h1 { letter-spacing: -0.035em; }
 .page-enter-from { opacity: 0; transform: translateY(18px) scale(.995); }
 .page-leave-to   { opacity: 0; transform: translateY(-10px); }
 
+/* —— 登录成功全屏转场 —— */
+.hda-wipe {
+  position: fixed; z-index: 4000; left: 50%; top: 50%;
+  width: 40px; height: 40px; border-radius: 50%;
+  background: radial-gradient(circle, #3E86EC 0%, #2E6FE0 55%, #2458B8 100%);
+  transform: translate(-50%,-50%) scale(0); pointer-events: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration:.001ms !important; transition-duration:.001ms !important; }
   [data-reveal] { opacity: 1; transform: none; }
 }
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-thumb { background: #CFE4DA; border-radius: 999px; }
+::-webkit-scrollbar-thumb { background: #C9D8EE; border-radius: 999px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--el-color-primary-light-3); }

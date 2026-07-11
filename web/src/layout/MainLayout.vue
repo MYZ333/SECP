@@ -1,80 +1,125 @@
 <template>
-  <el-container class="app">
-    <el-aside width="248px" class="aside">
-      <div class="logo">
-        <div class="logo-badge"><el-icon :size="24"><FirstAidKit /></el-icon></div>
-        <span>智慧医养</span>
-      </div>
-      <el-scrollbar class="menu-scroll">
-        <el-menu :default-active="$route.path" router class="menu">
-          <el-menu-item index="/dashboard"><el-icon><HomeFilled /></el-icon><span>首页</span></el-menu-item>
-          <el-sub-menu index="health">
-            <template #title><el-icon><Notebook /></el-icon><span>健康档案</span></template>
-            <el-menu-item index="/health/profile">基本信息</el-menu-item>
-            <el-menu-item index="/health/metric">体征数据</el-menu-item>
-            <el-menu-item index="/health/medical">就诊记录</el-menu-item>
-            <el-menu-item index="/health/report">健康报告</el-menu-item>
-          </el-sub-menu>
-          <el-sub-menu index="point">
-            <template #title><el-icon><GoldMedal /></el-icon><span>积分中心</span></template>
-            <el-menu-item index="/point/mall">积分商城</el-menu-item>
-            <el-menu-item index="/point/record">积分明细</el-menu-item>
-          </el-sub-menu>
-          <el-menu-item index="/doctor"><el-icon><Avatar /></el-icon><span>医生专家库</span></el-menu-item>
-          <el-menu-item index="/consult"><el-icon><ChatDotRound /></el-icon><span>健康咨询</span></el-menu-item>
-          <el-menu-item index="/alert"><el-icon><BellFilled /></el-icon><span>健康预警</span></el-menu-item>
-          <el-menu-item index="/account"><el-icon><Setting /></el-icon><span>账户管理</span></el-menu-item>
-          <el-sub-menu index="admin" v-if="userStore.isAdmin">
-            <template #title><el-icon><Management /></el-icon><span>系统管理</span></template>
-            <el-menu-item index="/admin/user">用户管理</el-menu-item>
-            <el-menu-item index="/admin/product">商品管理</el-menu-item>
-            <el-menu-item index="/admin/doctor">专家管理</el-menu-item>
-          </el-sub-menu>
-        </el-menu>
-      </el-scrollbar>
-    </el-aside>
-
-    <el-container>
-      <el-header class="header">
-        <div class="crumb">
-          <span class="dot"></span>
-          <h2>{{ $route.name }}</h2>
+  <div class="app hda-ambient">
+    <!-- 顶部导航栏（阿里云风格：悬停向下展开） -->
+    <header class="topnav" @mouseleave="openKey = null">
+      <div class="nav-inner">
+        <div class="logo" @click="$router.push('/dashboard')">
+          <svg class="logo-icon" viewBox="0 0 52 34" aria-hidden="true">
+            <path d="M15.5 1.5 C7 1.5 1.5 7 1.5 15.5 v3 C1.5 27 7 32.5 15.5 32.5 h6.2 l-4.6-5.6 h-1.6 c-4.6 0-7-2.4-7-7 v-5.8 c0-4.6 2.4-7 7-7 h1.6 L21.7 1.5 Z" />
+            <path d="M36.5 1.5 C45 1.5 50.5 7 50.5 15.5 v3 c0 8.5-5.5 14-14 14 h-6.2 l4.6-5.6 h1.6 c4.6 0 7-2.4 7-7 v-5.8 c0-4.6-2.4-7-7-7 h-1.6 L30.3 1.5 Z" />
+            <rect x="19" y="14.6" width="14" height="4.8" rx="1" />
+          </svg>
+          <span class="logo-text">12组</span>
+          <span class="logo-sub">智慧医养</span>
         </div>
+
+        <nav class="nav-items">
+          <template v-for="item in navList" :key="item.key">
+            <div v-if="item.children" class="nav-link"
+                 :class="{ active: isActive(item), open: openKey === item.key }"
+                 @mouseenter="openKey = item.key">
+              {{ item.title }}
+            </div>
+            <router-link v-else :to="item.path" class="nav-link"
+                         :class="{ active: isActive(item) }"
+                         @mouseenter="openKey = null">
+              {{ item.title }}
+            </router-link>
+          </template>
+        </nav>
+
         <el-dropdown @command="onCommand">
           <span class="user">
-            <el-avatar :size="40" :src="userStore.userInfo.avatar" class="ava">
-              {{ (userStore.userInfo.nickname || userStore.userInfo.username || 'U').charAt(0) }}
-            </el-avatar>
+            <span class="ava">{{ (userStore.userInfo.nickname || userStore.userInfo.username || 'U').charAt(0) }}</span>
             <span class="uname">{{ userStore.userInfo.nickname || userStore.userInfo.username }}</span>
-            <el-icon><ArrowDown /></el-icon>
           </span>
           <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item command="account" :icon="Setting">账户管理</el-dropdown-item>
-              <el-dropdown-item command="logout" :icon="SwitchButton" divided>退出登录</el-dropdown-item>
+            <el-dropdown-menu class="sq-dropdown">
+              <el-dropdown-item command="account">账户管理</el-dropdown-item>
+              <el-dropdown-item command="logout" divided>退出登录</el-dropdown-item>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
-      </el-header>
+      </div>
 
-      <el-main>
-        <router-view v-slot="{ Component }">
-          <transition name="page" mode="out-in">
-            <component :is="Component" />
-          </transition>
-        </router-view>
-      </el-main>
-    </el-container>
-  </el-container>
+      <!-- 向下展开的子菜单面板 -->
+      <transition name="drop">
+        <div v-if="openItem" class="mega">
+          <div class="mega-inner">
+            <router-link v-for="c in openItem.children" :key="c.path" :to="c.path"
+                         class="mega-link" :class="{ on: $route.path === c.path }"
+                         @click="openKey = null">
+              <span class="t">{{ c.title }}</span>
+              <span class="d">{{ c.desc }}</span>
+            </router-link>
+          </div>
+        </div>
+      </transition>
+    </header>
+
+    <main class="page-main">
+      <router-view v-slot="{ Component }">
+        <transition name="page" mode="out-in">
+          <component :is="Component" />
+        </transition>
+      </router-view>
+    </main>
+  </div>
 </template>
 
 <script setup>
-import { useRouter } from 'vue-router'
+import { ref, computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/store/user'
-import { FirstAidKit, HomeFilled, Notebook, GoldMedal, Avatar, ChatDotRound,
-  BellFilled, Setting, Management, ArrowDown, SwitchButton } from '@element-plus/icons-vue'
+
 const router = useRouter()
+const route = useRoute()
 const userStore = useUserStore()
+const openKey = ref(null)
+
+const navList = computed(() => {
+  const list = [
+    { key: 'dashboard', title: '首页', path: '/dashboard' },
+    {
+      key: 'health', title: '健康档案', base: '/health',
+      children: [
+        { title: '基本信息', path: '/health/profile', desc: '个人资料与健康标签' },
+        { title: '体征数据', path: '/health/metric', desc: '血压、血糖等日常记录' },
+        { title: '就诊记录', path: '/health/medical', desc: '历次就诊与用药信息' },
+        { title: '健康报告', path: '/health/report', desc: '周期性健康分析报告' },
+      ],
+    },
+    {
+      key: 'point', title: '积分中心', base: '/point',
+      children: [
+        { title: '积分商城', path: '/point/mall', desc: '积分好礼免费兑换' },
+        { title: '积分明细', path: '/point/record', desc: '积分获取与消耗记录' },
+      ],
+    },
+    { key: 'doctor', title: '医生专家库', path: '/doctor' },
+    { key: 'consult', title: '健康咨询', path: '/consult' },
+    { key: 'alert', title: '健康预警', path: '/alert' },
+    { key: 'account', title: '账户管理', path: '/account' },
+  ]
+  if (userStore.isAdmin) {
+    list.push({
+      key: 'admin', title: '系统管理', base: '/admin',
+      children: [
+        { title: '用户管理', path: '/admin/user', desc: '平台用户与权限管理' },
+        { title: '商品管理', path: '/admin/product', desc: '积分商城商品维护' },
+        { title: '专家管理', path: '/admin/doctor', desc: '医生专家信息维护' },
+      ],
+    })
+  }
+  return list
+})
+
+const openItem = computed(() => navList.value.find(i => i.key === openKey.value && i.children))
+
+function isActive(item) {
+  if (item.path) return route.path === item.path
+  return item.base && route.path.startsWith(item.base)
+}
 function onCommand(cmd) {
   if (cmd === 'logout') { userStore.logout(); router.push('/login') }
   if (cmd === 'account') router.push('/account')
@@ -82,71 +127,88 @@ function onCommand(cmd) {
 </script>
 
 <style scoped>
-.app { height: 100vh; }
+.app { min-height: 100vh; display: flex; flex-direction: column; }
 
-/* 侧边栏 */
-.aside {
-  background: linear-gradient(180deg, #21806A 0%, #1C6E5B 100%);
-  display: flex; flex-direction: column;
-  box-shadow: 4px 0 24px rgba(28,110,91,.18);
+/* ============ 顶部导航栏 ============ */
+.topnav {
+  position: sticky; top: 0; z-index: 100;
+  background: #fff;
+  border-bottom: 1px solid rgba(28,63,120,.08);
+  box-shadow: 0 2px 10px rgba(28,63,120,.06);
 }
-.logo {
-  height: 76px; display: flex; align-items: center; gap: 12px;
-  padding: 0 22px; color: #fff; font-size: 22px; font-weight: 700; letter-spacing: .04em;
+.nav-inner {
+  height: 64px; max-width: 1440px; margin: 0 auto;
+  display: flex; align-items: center; gap: 36px;
+  padding: 0 28px;
 }
-.logo-badge {
-  width: 42px; height: 42px; border-radius: 13px; display: grid; place-items: center;
-  background: rgba(255,255,255,.18); animation: hdaFloat 5s ease-in-out infinite;
-}
-.menu-scroll { flex: 1; }
-.menu {
-  padding: 8px 12px;
-  /* 关键：让内嵌子菜单也用透明背景、浅色文字，避免展开后一片白 */
-  --el-menu-bg-color: transparent;
-  --el-menu-hover-bg-color: transparent;
-  --el-menu-text-color: rgba(255,255,255,.82);
-  --el-menu-hover-text-color: #fff;
-  --el-menu-active-color: #fff;
-}
-.menu, .menu :deep(.el-menu--inline) { background: transparent !important; }
 
-/* 菜单项：暖色高亮 + 悬浮位移 */
-.menu :deep(.el-menu-item),
-.menu :deep(.el-sub-menu__title) {
-  color: rgba(255,255,255,.82); height: 52px; border-radius: 14px; margin: 4px 0;
-  font-size: 17px; transition: all .25s cubic-bezier(.2,.8,.2,1);
-  cursor: pointer; user-select: none;
-}
-.menu :deep(.el-menu-item:hover),
-.menu :deep(.el-sub-menu__title:hover) {
-  background: rgba(255,255,255,.12); color: #fff; transform: translateX(4px);
-}
-.menu :deep(.el-menu-item.is-active) {
-  background: #fff; color: var(--el-color-primary); font-weight: 700;
-  box-shadow: 0 8px 20px rgba(0,0,0,.14);
-}
-.menu :deep(.el-sub-menu .el-menu-item) { background: transparent; min-width: auto; }
-/* 子菜单选中项：与顶级菜单保持一致的白色圆角高亮 */
-.menu :deep(.el-sub-menu .el-menu-item.is-active) {
-  background: #fff !important; color: var(--el-color-primary) !important; font-weight: 700;
-  box-shadow: 0 8px 20px rgba(0,0,0,.14);
-}
-.menu :deep(.el-sub-menu.is-active .el-sub-menu__title) { color: #fff; }
-.menu :deep(.el-icon) { font-size: 20px; }
+/* Logo（与登录页一致） */
+.logo { display: flex; align-items: center; gap: 8px; cursor: pointer; flex-shrink: 0; }
+.logo-icon { width: 34px; height: auto; fill: #FF6A00; }
+.logo-text { font-size: 24px; font-weight: 700; color: #FF6A00; line-height: 1; }
+.logo-sub { font-size: 14px; color: #999; margin-left: 2px; padding-top: 6px; }
 
-/* 顶栏 */
-.header {
-  height: 76px; display: flex; justify-content: space-between; align-items: center;
-  background: rgba(255,255,255,.78); backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--hda-line); padding: 0 28px;
+/* 导航项（无图标） */
+.nav-items { display: flex; align-items: center; gap: 4px; flex: 1; height: 100%; }
+.nav-link {
+  position: relative; display: flex; align-items: center; height: 64px;
+  padding: 0 16px; font-size: 16px; color: #333; cursor: pointer;
+  text-decoration: none; transition: color .2s; user-select: none;
 }
-.crumb { display: flex; align-items: center; gap: 12px; }
-.crumb .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--hda-accent); box-shadow: 0 0 0 4px rgba(242,149,94,.2); }
-.crumb h2 { margin: 0; font-size: 22px; font-weight: 700; color: var(--hda-ink); }
-.user { display: flex; align-items: center; gap: 10px; cursor: pointer; padding: 6px 10px; border-radius: 999px; transition: background .25s; }
+.nav-link:hover, .nav-link.open { color: var(--el-color-primary); }
+.nav-link.active { color: var(--el-color-primary); font-weight: 700; }
+.nav-link.active::after, .nav-link.open::after {
+  content: ""; position: absolute; left: 12px; right: 12px; bottom: 0;
+  height: 3px; background: var(--el-color-primary);
+}
+
+/* 用户区（直角） */
+.user {
+  display: flex; align-items: center; gap: 10px; cursor: pointer;
+  padding: 6px 12px; transition: background .2s;
+}
 .user:hover { background: var(--el-color-primary-light-9); }
-.ava { background: var(--el-color-primary); color: #fff; font-weight: 700; }
-.uname { font-size: 17px; font-weight: 600; color: var(--hda-ink); }
+.ava {
+  width: 36px; height: 36px; display: grid; place-items: center;
+  background: linear-gradient(135deg, #3E86EC, #2E6FE0);
+  color: #fff; font-weight: 700; font-size: 16px;
+}
+.uname { font-size: 15px; font-weight: 600; color: var(--hda-ink); }
 
-.el-main { position: relative; padding: 28px; background: var(--hda-bg); }
+/* ============ 悬停向下展开的子菜单 ============ */
+.mega {
+  position: absolute; left: 0; right: 0; top: 64px;
+  background: #fff;
+  border-top: 1px solid rgba(28,63,120,.06);
+  box-shadow: 0 18px 36px rgba(28,63,120,.14);
+  transform-origin: top;
+  overflow: hidden;
+}
+.mega-inner {
+  max-width: 1440px; margin: 0 auto; padding: 26px 28px 30px;
+  display: flex; flex-wrap: wrap; gap: 8px 56px;
+}
+.mega-link {
+  display: flex; flex-direction: column; gap: 5px;
+  min-width: 220px; padding: 12px 14px;
+  text-decoration: none; transition: background .2s;
+}
+.mega-link:hover { background: #F4F8FE; }
+.mega-link .t { font-size: 16px; font-weight: 700; color: #222; }
+.mega-link:hover .t, .mega-link.on .t { color: var(--el-color-primary); }
+.mega-link .d { font-size: 13px; color: #8a93a6; }
+
+/* 展开动画：向下滑出 */
+.drop-enter-active, .drop-leave-active { transition: all .28s cubic-bezier(.2,.8,.2,1); }
+.drop-enter-from, .drop-leave-to { opacity: 0; transform: scaleY(.6); }
+
+/* ============ 内容区 ============ */
+.page-main { flex: 1; position: relative; z-index: 1; padding: 28px; }
+</style>
+
+<style>
+/* 用户下拉菜单：直角、无图标 */
+.sq-dropdown.el-dropdown-menu { border-radius: 0; padding: 4px 0; }
+.sq-dropdown .el-dropdown-menu__item { border-radius: 0; font-size: 15px; padding: 10px 22px; }
+.el-popper.is-light:has(.sq-dropdown) { border-radius: 0; }
 </style>
