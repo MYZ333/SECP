@@ -37,6 +37,12 @@ public class DoctorServiceImpl extends ServiceImpl<DoctorMapper, Doctor> impleme
     /** 医生被修改/删除时，清空详情缓存，保证后台改动立即生效 */
     @Override
     @CacheEvict(value = "doctor:detail", allEntries = true)
+    public boolean save(Doctor entity) {
+        return super.save(entity);
+    }
+
+    @Override
+    @CacheEvict(value = "doctor:detail", allEntries = true)
     public boolean updateById(Doctor entity) {
         return super.updateById(entity);
     }

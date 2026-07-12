@@ -64,6 +64,16 @@ export const pageDoctors = (params) => request.get('/doctor/page', { params })
 export const getDoctorDepartments = () => request.get('/doctor/departments')
 export const consultChat = (data) => request.post('/consult/chat', data)
 export const consultHistory = (params) => request.get('/consult/history', { params })
+export const startDoctorSession = (doctorId) => request.post(`/doctor-consult/session/${doctorId}`)
+export const pageDoctorConsultSessions = (params) => request.get('/doctor-consult/sessions', { params })
+export const getDoctorConsultMessages = (sessionId) => request.get(`/doctor-consult/session/${sessionId}/messages`)
+export const sendDoctorConsultMessage = (sessionId, data) => request.post(`/doctor-consult/session/${sessionId}/messages`, data)
+export const uploadConsultAttachment = (formData) => request.post('/file/consult-attachment', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+export function doctorConsultWsUrl() {
+  const token = localStorage.getItem('token') || ''
+  const protocol = location.protocol === 'https:' ? 'wss' : 'ws'
+  return `${protocol}://${location.host}/ws/doctor-consult?token=${encodeURIComponent(token)}`
+}
 export const pageAlerts = (params) => request.get('/alert/page', { params })
 export const generateAlert = () => request.post('/alert/generate')
 export const markAlertRead = (id) => request.put(`/alert/${id}/read`)
@@ -80,3 +90,4 @@ export const adminPageDoctors = (params) => request.get('/admin/doctor/page', { 
 export const adminCreateDoctor = (data) => request.post('/admin/doctor', data)
 export const adminUpdateDoctor = (data) => request.put('/admin/doctor', data)
 export const adminDeleteDoctor = (id) => request.delete(`/admin/doctor/${id}`)
+export const adminAuditDoctor = (id, approved) => request.put(`/admin/doctor/${id}/audit`, null, { params: { approved } })

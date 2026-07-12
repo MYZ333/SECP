@@ -63,7 +63,7 @@
           <p class="d-intro">{{ current.introduction || '暂无简介' }}</p>
         </div>
         <el-button type="primary" size="large" class="d-ask" @click="askDoctor(current)">向TA咨询健康问题</el-button>
-        <p class="d-note">咨询由 AI 健康助手基于医生擅长领域应答</p>
+        <p class="d-note">将进入医生咨询，与医生实时沟通</p>
       </div>
     </el-drawer>
   </div>
@@ -99,11 +99,9 @@ function specTags(s) {
   return (s || '').split(/[、，,;；]/).map(x => x.trim()).filter(Boolean)
 }
 
-/** 跳转健康咨询页，预填问题（只填入输入框，不自动发送） */
+/** 跳转医生咨询页，进入与该医生的实时会话 */
 function askDoctor(d) {
-  const spec = specTags(d.speciality)[0] || d.department
-  const q = `我想咨询${d.department}的健康问题，主要是关于${spec}方面的，请给我一些建议。`
-  router.push({ path: '/consult', query: { q } })
+  router.push({ path: '/doctor-consult', query: { doctorId: d.id } })
 }
 
 onMounted(() => {

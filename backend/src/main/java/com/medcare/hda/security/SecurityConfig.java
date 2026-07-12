@@ -40,6 +40,8 @@ public class SecurityConfig {
             "/api/auth/public-key",
             "/api/auth/refresh",
             "/api/auth/logout",
+            "/api/doctor-auth/register",
+            "/ws/doctor-consult",
             "/uploads/**",
             "/doc.html",
             "/webjars/**",

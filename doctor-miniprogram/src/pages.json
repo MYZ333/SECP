@@ -1,0 +1,27 @@
+{
+  "pages": [
+    { "path": "pages/login/login", "style": { "navigationBarTitleText": "医生登录", "navigationStyle": "custom" } },
+    { "path": "pages/dashboard/dashboard", "style": { "navigationBarTitleText": "医生工作台" } },
+    { "path": "pages/patients/patients", "style": { "navigationBarTitleText": "患者列表" } },
+    { "path": "pages/patients/detail", "style": { "navigationBarTitleText": "患者详情" } },
+    { "path": "pages/sessions/sessions", "style": { "navigationBarTitleText": "咨询会话" } },
+    { "path": "pages/profile/profile", "style": { "navigationBarTitleText": "个人资料" } }
+  ],
+  "tabBar": {
+    "color": "#5D7189",
+    "selectedColor": "#2E6FE0",
+    "backgroundColor": "#FFFFFF",
+    "borderStyle": "white",
+    "list": [
+      { "pagePath": "pages/dashboard/dashboard", "text": "工作台" },
+      { "pagePath": "pages/patients/patients", "text": "患者" },
+      { "pagePath": "pages/sessions/sessions", "text": "会话" },
+      { "pagePath": "pages/profile/profile", "text": "我的" }
+    ]
+  },
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarBackgroundColor": "#EFF4FA",
+    "backgroundColor": "#EFF4FA"
+  }
+}

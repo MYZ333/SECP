@@ -20,8 +20,14 @@ public class Doctor extends BaseEntity {
     @Schema(description = "医生姓名")
     private String name;
 
+    @Schema(description = "关联登录用户ID")
+    private Long userId;
+
     @Schema(description = "头像URL")
     private String avatar;
+
+    @Schema(description = "联系电话")
+    private String phone;
 
     @Schema(description = "职称, 如 主任医师")
     private String title;
@@ -40,4 +46,7 @@ public class Doctor extends BaseEntity {
 
     @Schema(description = "状态: 0 停用 1 启用")
     private Integer status;
+
+    @Schema(description = "审核状态: PENDING / APPROVED / REJECTED")
+    private String auditStatus;
 }
