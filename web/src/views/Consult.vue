@@ -41,12 +41,29 @@
 </template>
 
 <script setup>
-import { ref, nextTick } from 'vue'
+import { ref, nextTick, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ChatDotRound, Avatar, Promotion } from '@element-plus/icons-vue'
-import { consultChat } from '@/api'
+import { consultChat, consultHistory } from '@/api'
+const route = useRoute()
 const messages = ref([]), text = ref(''), loading = ref(false), sessionId = ref(''), msgBox = ref(null)
 const samples = ['最近血压有点高怎么办？', '老年人补钙吃什么好？', '血糖偏高饮食注意什么？']
+
+onMounted(async () => {
+  // 回显历史对话（近 50 条，接同一会话继续聊）
+  try {
+    const res = await consultHistory({ pageNum: 1, pageSize: 50 })
+    const records = res.data.records || []
+    messages.value = records.map(r => ({ role: r.role, content: r.content }))
+    if (records.length) sessionId.value = records[records.length - 1].sessionId || ''
+    scroll()
+  } catch (e) { /* 历史加载失败不影响新对话 */ }
+  // 从医生专家库“向TA咨询”跳转而来：问题预填入输入框，用户确认后自行发送
+  if (typeof route.query.q === 'string' && route.query.q.trim()) {
+    text.value = route.query.q.trim()
+  }
+})
 
 async function send() {
   if (!text.value.trim() || loading.value) return

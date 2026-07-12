@@ -3,6 +3,7 @@
     <el-button type="primary" @click="openDialog()">新增商品</el-button>
     <el-table :data="list" style="margin-top:15px" border>
       <el-table-column prop="name" label="名称" />
+      <el-table-column prop="category" label="类别" width="110" />
       <el-table-column prop="pointsCost" label="所需积分" />
       <el-table-column prop="stock" label="库存" />
       <el-table-column label="状态"><template #default="{ row }">
@@ -15,9 +16,14 @@
     </el-table>
     <el-pagination style="margin-top:15px" layout="prev, pager, next" :total="total"
                    :page-size="query.pageSize" @current-change="onPage" />
-    <el-dialog v-model="dialog" :title="form.id ? '编辑' : '新增'" width="500px">
+    <el-dialog v-model="dialog" :title="form.id ? '编辑' : '新增'" width="500px" append-to-body>
       <el-form :model="form" label-width="100px">
         <el-form-item label="名称"><el-input v-model="form.name" /></el-form-item>
+        <el-form-item label="类别">
+          <el-select v-model="form.category" placeholder="选择或输入类别" allow-create filterable clearable style="width:100%">
+            <el-option v-for="c in CATEGORIES" :key="c" :label="c" :value="c" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="图片URL"><el-input v-model="form.image" /></el-form-item>
         <el-form-item label="描述"><el-input v-model="form.description" type="textarea" /></el-form-item>
         <el-form-item label="所需积分"><el-input-number v-model="form.pointsCost" :min="0" /></el-form-item>
@@ -33,6 +39,7 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { adminPageProducts, adminCreateProduct, adminUpdateProduct, adminDeleteProduct } from '@/api'
+const CATEGORIES = ['健康监测', '医疗服务', '康复护理', '营养保健', '生活家居']
 const list = ref([]), total = ref(0), dialog = ref(false), form = ref({})
 const query = ref({ pageNum: 1, pageSize: 10 })
 async function load() { const res = await adminPageProducts(query.value); list.value = res.data.records; total.value = res.data.total }

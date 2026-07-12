@@ -5,6 +5,8 @@ import com.medcare.hda.common.Result;
 import com.medcare.hda.entity.HealthProfile;
 import com.medcare.hda.security.SecurityUtil;
 import com.medcare.hda.service.HealthProfileService;
+import com.medcare.hda.service.PointService;
+import org.springframework.util.StringUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 public class HealthProfileController {
 
     private final HealthProfileService service;
+    private final PointService pointService;
 
     @Operation(summary = "获取当前用户健康基本信息")
     @GetMapping
@@ -40,6 +43,18 @@ public class HealthProfileController {
         } else {
             service.save(profile);
         }
+        // 积分任务: 关键信息填写完整后标记为"待领取"（到积分中心手动领取，一次性）
+        if (isComplete(profile)) {
+            pointService.markTaskReady(userId, "PROFILE");
+        }
         return Result.success("保存成功", profile);
+    }
+
+    /** 判断档案关键信息是否填写完整 */
+    private boolean isComplete(HealthProfile p) {
+        return p.getHeight() != null && p.getWeight() != null
+                && StringUtils.hasText(p.getBloodType())
+                && StringUtils.hasText(p.getEmergencyContact())
+                && StringUtils.hasText(p.getEmergencyPhone());
     }
 }

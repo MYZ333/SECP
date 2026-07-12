@@ -17,7 +17,7 @@
     </el-table>
     <el-pagination style="margin-top:15px" layout="prev, pager, next" :total="total"
                    :page-size="query.pageSize" @current-change="onPage" />
-    <el-dialog v-model="dialog" :title="form.id ? '编辑' : '新增'" width="500px">
+    <el-dialog v-model="dialog" :title="form.id ? '编辑' : '新增'" width="500px" append-to-body>
       <el-form :model="form" label-width="100px">
         <el-form-item label="姓名"><el-input v-model="form.name" /></el-form-item>
         <el-form-item label="头像URL"><el-input v-model="form.avatar" /></el-form-item>

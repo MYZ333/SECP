@@ -34,6 +34,13 @@ public class SecurityConfig {
     private static final String[] WHITE_LIST = {
             "/api/auth/login",
             "/api/auth/register",
+            "/api/auth/sms-code",
+            "/api/auth/phone-login",
+            "/api/auth/reset-password",
+            "/api/auth/public-key",
+            "/api/auth/refresh",
+            "/api/auth/logout",
+            "/uploads/**",
             "/doc.html",
             "/webjars/**",
             "/v3/api-docs/**",

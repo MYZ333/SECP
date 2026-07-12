@@ -53,6 +53,17 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-aop</artifactId>
         </dependency>
+        <!-- Cache（声明式缓存：热点数据 Redis 缓存） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-cache</artifactId>
+        </dependency>
+        <!-- Redisson（分布式锁；核心包，自带 Netty，无 Spring 版本冲突，手动装配 RedissonClient） -->
+        <dependency>
+            <groupId>org.redisson</groupId>
+            <artifactId>redisson</artifactId>
+            <version>3.34.1</version>
+        </dependency>
 
         <!-- MyBatis-Plus (Spring Boot 3) -->
         <dependency>
@@ -105,6 +116,13 @@
             <groupId>cn.hutool</groupId>
             <artifactId>hutool-all</artifactId>
             <version>${hutool.version}</version>
+        </dependency>
+
+        <!-- 阿里云短信（手机号登录/忘记密码验证码） -->
+        <dependency>
+            <groupId>com.aliyun</groupId>
+            <artifactId>dysmsapi20170525</artifactId>
+            <version>2.0.24</version>
         </dependency>
 
         <!-- Spring AI (骨架预留, 具体模型由他人接入) -->

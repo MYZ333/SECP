@@ -10,7 +10,10 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "hda.jwt")
 public class JwtProperties {
     private String secret;
+    /** access token 有效期（毫秒） */
     private Long expiration;
+    /** refresh token 有效期（毫秒） */
+    private Long refreshExpiration = 604800000L;
     private String header = "Authorization";
     private String tokenPrefix = "Bearer ";
 }

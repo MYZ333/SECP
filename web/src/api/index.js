@@ -1,8 +1,18 @@
 import request from './request'
+import { encryptPassword } from './crypto'
 
-// 认证
-export const login = (data) => request.post('/auth/login', data)
-export const register = (data) => request.post('/auth/register', data)
+// 认证（登录/注册/重置：密码经 RSA 加密后再提交）
+export const login = async (data) =>
+  request.post('/auth/login', { ...data, password: await encryptPassword(data.password) })
+export const register = async (data) =>
+  request.post('/auth/register', { ...data, password: await encryptPassword(data.password) })
+export const sendSmsCode = (data) => request.post('/auth/sms-code', data)
+export const phoneLogin = (data) => request.post('/auth/phone-login', data)
+export const resetPassword = async (data) =>
+  request.post('/auth/reset-password', { ...data, newPassword: await encryptPassword(data.newPassword) })
+export const refreshToken = (data) => request.post('/auth/refresh', data)
+export const logoutApi = () => request.post('/auth/logout')
+export const getIdempotencyToken = () => request.get('/idempotent/token')
 
 // 账户
 export const getMe = () => request.get('/account/me')
@@ -34,17 +44,31 @@ export const deleteReport = (id) => request.delete(`/health/report/${id}`)
 
 // 积分
 export const getPointBalance = () => request.get('/point/balance')
+export const checkIn = () => request.post('/point/check-in')
+export const getPointTasks = () => request.get('/point/tasks')
+export const claimTask = (type) => request.post('/point/claim/' + type)
 export const pagePointRecords = (params) => request.get('/point/records', { params })
 export const pagePointProducts = (params) => request.get('/point/products', { params })
-export const exchangeProduct = (data) => request.post('/point/exchange', data)
+export const getProductCategories = () => request.get('/point/categories')
+// 兑换：先领幂等令牌，随 Idempotency-Key 头提交，防重复兑换
+export const exchangeProduct = async (data) => {
+  const res = await getIdempotencyToken()
+  return request.post('/point/exchange', data, {
+    headers: { 'Idempotency-Key': res.data.idempotencyKey }
+  })
+}
 export const pageMyExchanges = (params) => request.get('/point/exchanges', { params })
 
 // AI 模块
 export const pageDoctors = (params) => request.get('/doctor/page', { params })
+export const getDoctorDepartments = () => request.get('/doctor/departments')
 export const consultChat = (data) => request.post('/consult/chat', data)
 export const consultHistory = (params) => request.get('/consult/history', { params })
 export const pageAlerts = (params) => request.get('/alert/page', { params })
 export const generateAlert = () => request.post('/alert/generate')
+export const markAlertRead = (id) => request.put(`/alert/${id}/read`)
+export const generateReport = () => request.post('/health/report/generate')
+export const uploadAvatar = (formData) => request.post('/file/avatar', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
 
 // 管理端
 export const adminPageUsers = (params) => request.get('/admin/user/page', { params })

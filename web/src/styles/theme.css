@@ -122,12 +122,24 @@ h1 { letter-spacing: -0.035em; }
 .el-button--large { padding: 14px 26px; font-size: 17px; }
 .el-button:not(.is-text):not(.is-link):hover { transform: translateY(-2px); }
 .el-button:not(.is-text):not(.is-link):active { transform: translateY(0) scale(.96); }
-.el-button--primary {
+.el-button--primary:not(.is-plain) {
   background: linear-gradient(135deg, #3E86EC, #2E6FE0 60%, #2458B8);
   border: none; box-shadow: 0 8px 20px rgba(46,111,224,.30);
 }
-.el-button--primary:hover { box-shadow: 0 14px 30px rgba(46,111,224,.40); }
+.el-button--primary:not(.is-plain):hover { box-shadow: 0 14px 30px rgba(46,111,224,.40); }
 .el-button--primary:focus-visible { outline: 3px solid var(--el-color-primary-light-7); outline-offset: 2px; }
+/* plain 主按钮：浅底蓝字，避免套用实心渐变导致蓝字压在蓝底上看不见 */
+.el-button--primary.is-plain {
+  background: var(--el-color-primary-light-9);
+  color: var(--el-color-primary);
+  border: 1px solid var(--el-color-primary-light-5);
+  box-shadow: none;
+}
+.el-button--primary.is-plain:hover {
+  background: var(--el-color-primary);
+  color: #fff;
+  border-color: transparent;
+}
 
 /* —— 输入框 —— */
 .el-input__wrapper, .el-textarea__inner {

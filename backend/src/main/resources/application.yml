@@ -6,11 +6,16 @@ server:
 spring:
   application:
     name: hda-backend
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 10MB
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/hda_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
-    username: root
-    password: 123456
+    # 生产环境用环境变量覆盖，勿把真实密码提交进仓库
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:123456}
   data:
     redis:
       host: localhost
@@ -49,13 +54,41 @@ mybatis-plus:
 
 # 自定义 JWT 配置
 hda:
+  # 阿里云短信。四项配置齐全时发真实短信；任一为空则为 mock 模式（验证码打印到后端日志）
+  sms:
+    access-key-id: ${SMS_ACCESS_KEY_ID:}
+    access-key-secret: ${SMS_ACCESS_KEY_SECRET:}
+    # 短信签名（阿里云控制台审核通过后填入，如：智慧医养）
+    sign-name: ${SMS_SIGN_NAME:}
+    # 模板 Code（模板内容须含 ${code} 变量，如：SMS_123456789）
+    template-code: ${SMS_TEMPLATE_CODE:}
+    endpoint: dysmsapi.aliyuncs.com
+  # 本地上传目录（头像等），通过 /uploads/** 对外访问
+  upload:
+    dir: ${UPLOAD_DIR:./uploads}
   jwt:
-    # 生产环境请替换为更长的随机密钥（至少 32 字节, HS256）
-    secret: hda-medcare-health-archive-secret-key-please-change-in-prod-2026
-    # 过期时间（毫秒），默认 7 天
-    expiration: 604800000
+    # 生产环境请通过环境变量 JWT_SECRET 覆盖（至少 32 字节, HS256）
+    secret: ${JWT_SECRET:hda-medcare-health-archive-secret-key-please-change-in-prod-2026}
+    # access token 过期时间（毫秒），默认 30 分钟
+    expiration: 1800000
+    # refresh token 过期时间（毫秒），默认 7 天
+    refresh-expiration: 604800000
     header: Authorization
     token-prefix: "Bearer "
+  # 限流阈值（Redis + Lua 滑动窗口）
+  ratelimit:
+    # 全局 QPS 兜底（每秒），系统级雪崩保护
+    global-qps: ${RATE_LIMIT_GLOBAL_QPS:500}
+  # 加解密：RSA 用于密码传输加密，AES 用于敏感字段落库加密
+  crypto:
+    # RSA 密钥对（PEM/Base64，X.509 公钥 + PKCS#8 私钥）。留空则启动时自动生成。
+    # 多节点集群务必配置固定密钥对（放环境变量/配置中心），否则各节点公私钥不一致会导致解密失败。
+    rsa-public-key: ${RSA_PUBLIC_KEY:}
+    rsa-private-key: ${RSA_PRIVATE_KEY:}
+    # AES 敏感字段加密密钥（任意字符串，内部会 SHA-256 派生成 256 位密钥）。生产走环境变量。
+    aes-key: ${HDA_AES_KEY:hda-medcare-aes-field-secret-please-change-2026}
+    # 存量数据加密迁移开关：首次上线加密后设为 true 跑一次，把老明文加密回填，之后改回 false
+    migrate: ${HDA_CRYPTO_MIGRATE:false}
 
 # Knife4j 文档
 knife4j:

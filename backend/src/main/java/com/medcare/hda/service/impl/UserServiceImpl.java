@@ -55,6 +55,16 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
     @Override
     public void deactivate(Long userId) {
+        User user = getById(userId);
+        if (user == null) {
+            return;
+        }
+        // 逻辑删除后行仍在表中，先释放 username / phone 的唯一索引占用，
+        // 否则该用户名和手机号将永远无法再注册
+        update(Wrappers.<User>lambdaUpdate()
+                .eq(User::getId, userId)
+                .set(User::getUsername, user.getUsername() + "_del_" + userId)
+                .set(User::getPhone, null));
         removeById(userId);
     }
 }
