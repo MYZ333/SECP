@@ -26,7 +26,7 @@ public class PointRecord extends BaseEntity {
     @Schema(description = "变动后余额")
     private Integer balance;
 
-    @Schema(description = "类型: LOGIN 登录 / PROFILE 完善档案 / CHECKIN 打卡 / EXCHANGE 兑换 / ADMIN 管理员调整")
+    @Schema(description = "类型: LOGIN 登录 / CHECKIN 签到 / METRIC 记录健康数据 / CONSULT AI咨询 / PROFILE 完善档案 / EXCHANGE 兑换 / ADMIN 管理员调整")
     private String type;
 
     @Schema(description = "描述")

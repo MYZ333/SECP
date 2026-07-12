@@ -60,13 +60,16 @@
 
       <!-- 右侧：表单区 -->
       <section class="form-side">
-        <template v-if="tab !== 'register'">
+        <template v-if="tab === 'account' || tab === 'phone'">
           <div class="tabs-row" data-intro>
             <div class="tabs">
               <button :class="{ on: tab === 'account' }" @click="tab = 'account'">账密登录</button>
               <button :class="{ on: tab === 'phone' }" @click="tab = 'phone'">手机号登录</button>
             </div>
-            <a class="go-reg" @click="tab = 'register'">前往注册 ›</a>
+            <div class="links">
+              <a class="forgot" @click="tab = 'reset'">忘记密码</a>
+              <a class="go-reg" @click="tab = 'register'">前往注册 ›</a>
+            </div>
           </div>
 
           <transition name="swap" mode="out-in">
@@ -82,30 +85,31 @@
               <el-button type="primary" class="submit" data-intro :loading="loading" @click="doLogin">立即登录</el-button>
             </el-form>
 
-            <!-- 手机号登录（前端先行，后端待接入） -->
+            <!-- 手机号登录（未注册自动注册） -->
             <el-form v-else key="phone" :model="phoneForm" size="large" @submit.prevent>
               <el-form-item>
-                <el-input v-model="phoneForm.phone" placeholder="请输入" maxlength="11">
+                <el-input v-model="phoneForm.phone" placeholder="请输入手机号" maxlength="11">
                   <template #prepend>+86</template>
                 </el-input>
               </el-form-item>
               <el-form-item>
-                <el-input v-model="phoneForm.code" placeholder="请输入" maxlength="6">
+                <el-input v-model="phoneForm.code" placeholder="请输入验证码" maxlength="6" @keyup.enter="doPhoneLogin">
                   <template #prepend>验证码</template>
                   <template #append>
-                    <el-button class="code-btn" :disabled="countdown > 0" @click="sendCode">
+                    <el-button class="code-btn" :disabled="countdown > 0" @click="sendCode(phoneForm.phone)">
                       {{ countdown > 0 ? `${countdown}s 后重发` : '获取验证码' }}
                     </el-button>
                   </template>
                 </el-input>
               </el-form-item>
               <el-button type="primary" class="submit" :loading="loading" @click="doPhoneLogin">立即登录</el-button>
+              <p class="phone-hint">未注册的手机号验证通过后将自动创建账号</p>
             </el-form>
           </transition>
         </template>
 
         <!-- 注册 -->
-        <template v-else>
+        <template v-else-if="tab === 'register'">
           <div class="tabs-row">
             <div class="tabs"><button class="on">注册账号</button></div>
             <a class="go-reg" @click="tab = 'account'">返回登录 ›</a>
@@ -116,6 +120,36 @@
             <el-form-item><el-input v-model="regForm.nickname" placeholder="昵称（可选）" /></el-form-item>
             <el-form-item><el-input v-model="regForm.phone" placeholder="手机号（可选）" /></el-form-item>
             <el-button type="primary" class="submit" :loading="loading" @click="doRegister">立即注册</el-button>
+          </el-form>
+        </template>
+
+        <!-- 忘记密码：手机号+验证码重置 -->
+        <template v-else>
+          <div class="tabs-row">
+            <div class="tabs"><button class="on">忘记密码</button></div>
+            <a class="go-reg" @click="tab = 'account'">返回登录 ›</a>
+          </div>
+          <el-form :model="resetForm" size="large" @submit.prevent>
+            <el-form-item>
+              <el-input v-model="resetForm.phone" placeholder="请输入注册手机号" maxlength="11">
+                <template #prepend>+86</template>
+              </el-input>
+            </el-form-item>
+            <el-form-item>
+              <el-input v-model="resetForm.code" placeholder="请输入验证码" maxlength="6">
+                <template #prepend>验证码</template>
+                <template #append>
+                  <el-button class="code-btn" :disabled="countdown > 0" @click="sendCode(resetForm.phone)">
+                    {{ countdown > 0 ? `${countdown}s 后重发` : '获取验证码' }}
+                  </el-button>
+                </template>
+              </el-input>
+            </el-form-item>
+            <el-form-item>
+              <el-input v-model="resetForm.password" type="password" show-password
+                        placeholder="新密码（6-32位）" @keyup.enter="doReset" />
+            </el-form-item>
+            <el-button type="primary" class="submit" :loading="loading" @click="doReset">重置密码</el-button>
           </el-form>
         </template>
 
@@ -133,12 +167,12 @@ import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import gsap from 'gsap'
-import { login, register } from '@/api'
+import { login, register, sendSmsCode, phoneLogin, resetPassword } from '@/api'
 import { useUserStore } from '@/store/user'
 
 const router = useRouter()
 const userStore = useUserStore()
-const tab = ref('account')          // account | phone | register
+const tab = ref('account')          // account | phone | register | reset
 const fontMode = ref('normal')      // normal | large
 const loading = ref(false)
 const countdown = ref(0)
@@ -147,6 +181,7 @@ let countdownTimer = null
 const loginForm = ref({ username: '', password: '' })
 const phoneForm = ref({ phone: '', code: '' })
 const regForm = ref({ username: '', password: '', nickname: '', phone: '' })
+const resetForm = ref({ phone: '', code: '', password: '' })
 
 const wrap = ref(null), canvas = ref(null), panel = ref(null), wipe = ref(null), ecgPath = ref(null)
 
@@ -181,21 +216,49 @@ async function doLogin() {
   } finally { loading.value = false }
 }
 
-function sendCode() {
-  if (!/^1\d{10}$/.test(phoneForm.value.phone)) return ElMessage.warning('请输入正确的手机号')
-  countdown.value = 60
-  countdownTimer = setInterval(() => {
-    countdown.value--
-    if (countdown.value <= 0) clearInterval(countdownTimer)
-  }, 1000)
-  ElMessage.success('验证码已发送（短信服务后端待接入）')
+/** 发送验证码（手机号登录 / 忘记密码共用；后端限流：60s 间隔、每天 10 条） */
+async function sendCode(phone) {
+  if (!/^1\d{10}$/.test(phone)) return ElMessage.warning('请输入正确的手机号')
+  if (countdown.value > 0) return
+  try {
+    const res = await sendSmsCode({ phone })
+    ElMessage.success(res.message || '验证码已发送')
+    countdown.value = 60
+    countdownTimer = setInterval(() => {
+      countdown.value--
+      if (countdown.value <= 0) clearInterval(countdownTimer)
+    }, 1000)
+  } catch (e) { /* 错误信息由响应拦截器统一提示 */ }
 }
 
 async function doPhoneLogin() {
   if (!/^1\d{10}$/.test(phoneForm.value.phone)) return ElMessage.warning('请输入正确的手机号')
-  if (!phoneForm.value.code) return ElMessage.warning('请输入验证码')
-  // TODO: 后端手机号登录接口接入后替换
-  ElMessage.info('手机号登录后端接口待接入')
+  if (!/^\d{6}$/.test(phoneForm.value.code)) return ElMessage.warning('请输入6位验证码')
+  loading.value = true
+  try {
+    const res = await phoneLogin({ phone: phoneForm.value.phone, code: phoneForm.value.code })
+    userStore.setLogin(res.data)
+    await gsap.to(wipe.value, { scale: 90, duration: .8, ease: 'power3.in' })
+    router.push('/dashboard')
+  } finally { loading.value = false }
+}
+
+async function doReset() {
+  if (!/^1\d{10}$/.test(resetForm.value.phone)) return ElMessage.warning('请输入正确的手机号')
+  if (!/^\d{6}$/.test(resetForm.value.code)) return ElMessage.warning('请输入6位验证码')
+  if (resetForm.value.password.length < 6 || resetForm.value.password.length > 32)
+    return ElMessage.warning('新密码长度为6-32位')
+  loading.value = true
+  try {
+    const res = await resetPassword({
+      phone: resetForm.value.phone,
+      code: resetForm.value.code,
+      newPassword: resetForm.value.password,
+    })
+    ElMessage.success(res.message || '密码已重置，请使用新密码登录')
+    resetForm.value = { phone: '', code: '', password: '' }
+    tab.value = 'account'
+  } finally { loading.value = false }
 }
 
 async function doRegister() {
@@ -391,9 +454,19 @@ function stopParticles() {
   content: ""; position: absolute; left: 0; right: 0; bottom: 0;
   height: 3px; background: var(--el-color-primary);
 }
+.links { display: flex; align-items: center; gap: 18px; }
 .go-reg {
   font-size: calc(15px * var(--fz)); font-weight: 700;
   color: var(--el-color-primary); cursor: pointer;
+}
+.forgot {
+  font-size: calc(14px * var(--fz)); color: #8a93a6; cursor: pointer;
+  transition: color .2s;
+}
+.forgot:hover { color: var(--el-color-primary); }
+.phone-hint {
+  margin: 10px 0 0; font-size: calc(13px * var(--fz));
+  color: #8a93a6; text-align: center;
 }
 
 /* 直角输入框 */

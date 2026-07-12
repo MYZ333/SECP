@@ -14,8 +14,9 @@ public class RegisterDTO {
     private String username;
 
     @NotBlank(message = "密码不能为空")
-    @Size(min = 6, max = 32, message = "密码长度 6-32")
-    @Schema(description = "密码")
+    // 兼容 RSA 加密传输（密文较长）；明文 6-32 位的真实校验在解密后由服务层执行
+    @Size(max = 512, message = "密码格式不正确")
+    @Schema(description = "密码(支持前端 RSA 加密后传输)")
     private String password;
 
     @Schema(description = "昵称")

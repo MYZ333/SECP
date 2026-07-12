@@ -20,6 +20,9 @@ public class PointProduct extends BaseEntity {
     @Schema(description = "商品名称")
     private String name;
 
+    @Schema(description = "商品类别: 健康监测/医疗服务/康复护理/营养保健/生活家居")
+    private String category;
+
     @Schema(description = "商品图片URL")
     private String image;
 

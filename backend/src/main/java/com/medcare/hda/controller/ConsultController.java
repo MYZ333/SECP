@@ -2,12 +2,15 @@ package com.medcare.hda.controller;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.medcare.hda.annotation.RateLimit;
 import com.medcare.hda.common.PageResult;
 import com.medcare.hda.common.Result;
+import com.medcare.hda.common.ratelimit.LimitDimension;
 import com.medcare.hda.dto.ChatDTO;
 import com.medcare.hda.entity.ConsultRecord;
 import com.medcare.hda.security.SecurityUtil;
 import com.medcare.hda.service.AiChatService;
+import com.medcare.hda.service.AsyncTaskService;
 import com.medcare.hda.service.ConsultRecordService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -26,8 +29,11 @@ public class ConsultController {
 
     private final AiChatService aiChatService;
     private final ConsultRecordService consultRecordService;
+    private final AsyncTaskService asyncTaskService;
 
     @Operation(summary = "发起健康咨询")
+    @RateLimit(key = "ai-consult", window = 60, limit = 10, dimension = LimitDimension.USER,
+            message = "AI 咨询太频繁，请稍后再问")
     @PostMapping("/chat")
     public Result<ConsultRecord> chat(@Valid @RequestBody ChatDTO dto) {
         Long userId = SecurityUtil.getUserId();
@@ -41,6 +47,9 @@ public class ConsultController {
         userMsg.setRole("user");
         userMsg.setContent(dto.getMessage());
         consultRecordService.save(userMsg);
+
+        // 积分任务: 完成AI健康咨询后标记为"待领取"（异步，不阻塞主链路的 AI 应答）
+        asyncTaskService.markTaskReadyAsync(userId, "CONSULT");
 
         // 调用 AI（骨架, 占位）
         String answer = aiChatService.consult(userId, sessionId, dto.getMessage());

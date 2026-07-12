@@ -3,6 +3,8 @@ package com.medcare.hda.exception;
 import com.medcare.hda.common.Result;
 import com.medcare.hda.common.ResultCode;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.BindException;
@@ -39,9 +41,28 @@ public class GlobalExceptionHandler {
         return Result.fail(ResultCode.UNAUTHORIZED);
     }
 
+    /** 唯一键冲突：如手机号/用户名已被占用 */
+    @ExceptionHandler(DuplicateKeyException.class)
+    public Result<Void> handleDuplicateKey(DuplicateKeyException e) {
+        log.warn("唯一键冲突: {}", e.getMessage());
+        return Result.fail(ResultCode.PARAM_ERROR.getCode(), "数据已存在（如手机号/用户名已被使用），请检查后重试");
+    }
+
+    /** 数据完整性错误：字段超长、格式不符等，返回友好提示而不是 SQL 原文 */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public Result<Void> handleDataIntegrity(DataIntegrityViolationException e) {
+        log.warn("数据完整性异常: {}", e.getMessage());
+        String msg = String.valueOf(e.getMessage());
+        String friendly = msg.contains("Data too long")
+                ? "填写内容过长，请精简后再保存"
+                : "数据格式不正确，请检查填写内容后重试";
+        return Result.fail(ResultCode.PARAM_ERROR.getCode(), friendly);
+    }
+
     @ExceptionHandler(Exception.class)
     public Result<Void> handleException(Exception e) {
         log.error("系统异常", e);
-        return Result.fail(ResultCode.FAIL.getCode(), "系统异常: " + e.getMessage());
+        // 不向前端透出堆栈/SQL 细节，详细信息见后端日志
+        return Result.fail(ResultCode.FAIL.getCode(), "系统繁忙，请稍后重试");
     }
 }

@@ -8,8 +8,12 @@ import lombok.Data;
 @Builder
 @Schema(description = "登录返回")
 public class LoginVO {
-    @Schema(description = "JWT token")
+    @Schema(description = "JWT access token")
     private String token;
+    @Schema(description = "JWT refresh token（用于换取新 access token）")
+    private String refreshToken;
+    @Schema(description = "access token 有效期(毫秒)")
+    private Long expiresIn;
     @Schema(description = "用户ID")
     private Long userId;
     @Schema(description = "用户名")

@@ -24,7 +24,7 @@
     <el-empty v-if="!profile.id" description="还没有健康档案，点击右上角「修改信息」完善" />
 
     <!-- 编辑弹窗 -->
-    <el-dialog v-model="dialog" title="修改健康基本信息" width="600px">
+    <el-dialog v-model="dialog" title="修改健康基本信息" width="600px" append-to-body>
       <el-form :model="form" label-width="120px">
         <el-form-item label="身高(cm)"><el-input-number v-model="form.height" :min="0" :max="250" /></el-form-item>
         <el-form-item label="体重(kg)"><el-input-number v-model="form.weight" :min="0" :max="300" /></el-form-item>
@@ -33,12 +33,20 @@
             <el-option v-for="t in ['A','B','O','AB','未知']" :key="t" :label="t" :value="t" />
           </el-select>
         </el-form-item>
-        <el-form-item label="过敏史"><el-input v-model="form.allergyHistory" type="textarea" /></el-form-item>
-        <el-form-item label="家族病史"><el-input v-model="form.familyHistory" type="textarea" /></el-form-item>
-        <el-form-item label="既往病史"><el-input v-model="form.pastHistory" type="textarea" /></el-form-item>
-        <el-form-item label="紧急联系人"><el-input v-model="form.emergencyContact" /></el-form-item>
-        <el-form-item label="紧急联系电话"><el-input v-model="form.emergencyPhone" /></el-form-item>
-        <el-form-item label="备注"><el-input v-model="form.remark" type="textarea" /></el-form-item>
+        <el-form-item label="过敏史">
+          <el-input v-model="form.allergyHistory" type="textarea" :rows="3" maxlength="500" show-word-limit />
+        </el-form-item>
+        <el-form-item label="家族病史">
+          <el-input v-model="form.familyHistory" type="textarea" :rows="3" maxlength="500" show-word-limit />
+        </el-form-item>
+        <el-form-item label="既往病史">
+          <el-input v-model="form.pastHistory" type="textarea" :rows="3" maxlength="500" show-word-limit />
+        </el-form-item>
+        <el-form-item label="紧急联系人"><el-input v-model="form.emergencyContact" maxlength="50" /></el-form-item>
+        <el-form-item label="紧急联系电话"><el-input v-model="form.emergencyPhone" maxlength="20" /></el-form-item>
+        <el-form-item label="备注">
+          <el-input v-model="form.remark" type="textarea" :rows="3" maxlength="500" show-word-limit />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="dialog = false">取消</el-button>

@@ -3,6 +3,8 @@ package com.medcare.hda.entity;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.medcare.hda.annotation.Desensitize;
+import com.medcare.hda.common.crypto.DesensitizeType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -31,7 +33,8 @@ public class User extends BaseEntity {
     @Schema(description = "头像 URL")
     private String avatar;
 
-    @Schema(description = "手机号")
+    @Schema(description = "手机号(出参自动脱敏)")
+    @Desensitize(DesensitizeType.PHONE)
     private String phone;
 
     @Schema(description = "性别: 0 未知 1 男 2 女")
