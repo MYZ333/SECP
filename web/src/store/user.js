@@ -26,6 +26,10 @@ export const useUserStore = defineStore('user', {
       this.token = token
       localStorage.setItem('token', token)
     },
+    updateUserInfo(data = {}) {
+      this.userInfo = { ...this.userInfo, ...data }
+      localStorage.setItem('userInfo', JSON.stringify(this.userInfo))
+    },
     logout() {
       this.token = ''
       this.refreshToken = ''

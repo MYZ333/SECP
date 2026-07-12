@@ -31,8 +31,8 @@
         <div class="user-wrap" @mouseenter="showSummary" @mouseleave="sumVisible = false" @click="sumVisible = false">
           <el-dropdown trigger="click" @command="onCommand">
             <span class="user">
-              <span class="ava">{{ (userStore.userInfo.nickname || userStore.userInfo.username || 'U').charAt(0) }}</span>
-              <span class="uname">{{ userStore.userInfo.nickname || userStore.userInfo.username }}</span>
+              <el-avatar class="ava" :size="36" :src="userAvatar">{{ userInitial }}</el-avatar>
+              <span class="uname">{{ userDisplayName }}</span>
             </span>
             <template #dropdown>
               <el-dropdown-menu class="sq-dropdown">
@@ -93,6 +93,9 @@ const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
 const openKey = ref(null)
+const userDisplayName = computed(() => userStore.userInfo.nickname || userStore.userInfo.username || '用户')
+const userInitial = computed(() => userDisplayName.value.charAt(0))
+const userAvatar = computed(() => userStore.userInfo.avatar || '')
 
 /* —— 导航滚动收缩 —— */
 const scrolled = ref(false)
@@ -144,7 +147,8 @@ const navList = computed(() => {
       ],
     },
     { key: 'doctor', title: '医生专家库', path: '/doctor' },
-    { key: 'consult', title: '健康咨询', path: '/consult' },
+    { key: 'consult', title: '健康助手', path: '/consult' },
+    { key: 'doctorConsult', title: '医生咨询', path: '/doctor-consult' },
     { key: 'alert', title: '健康预警', path: '/alert' },
     { key: 'account', title: '账户管理', path: '/account' },
   ]

@@ -184,21 +184,70 @@ CREATE TABLE point_exchange (
 DROP TABLE IF EXISTS doctor;
 CREATE TABLE doctor (
     id           BIGINT       NOT NULL AUTO_INCREMENT,
+    user_id      BIGINT                DEFAULT NULL COMMENT '关联登录用户ID',
     name         VARCHAR(50)  NOT NULL COMMENT '姓名',
     avatar       VARCHAR(255)          DEFAULT NULL COMMENT '头像',
+    phone        VARCHAR(20)           DEFAULT NULL COMMENT '联系电话',
     title        VARCHAR(50)           DEFAULT NULL COMMENT '职称',
     hospital     VARCHAR(100)          DEFAULT NULL COMMENT '医院',
     department   VARCHAR(50)           DEFAULT NULL COMMENT '科室',
     speciality   VARCHAR(255)          DEFAULT NULL COMMENT '擅长',
     introduction VARCHAR(1000)         DEFAULT NULL COMMENT '简介',
     status       TINYINT      NOT NULL DEFAULT 1 COMMENT '状态:0停用1启用',
+    audit_status VARCHAR(20)  NOT NULL DEFAULT 'APPROVED' COMMENT '审核状态:PENDING/APPROVED/REJECTED',
     create_time  DATETIME              DEFAULT NULL,
     update_time  DATETIME              DEFAULT NULL,
     deleted      TINYINT      NOT NULL DEFAULT 0,
     PRIMARY KEY (id),
+    KEY idx_user_id (user_id),
     KEY idx_department (department),
     UNIQUE KEY uk_doctor (name, hospital, department)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='医生专家库';
+
+-- ---------------------------
+-- 医生咨询会话
+-- ---------------------------
+DROP TABLE IF EXISTS doctor_consult_session;
+CREATE TABLE doctor_consult_session (
+    id                BIGINT      NOT NULL AUTO_INCREMENT,
+    user_id           BIGINT      NOT NULL COMMENT '患者用户ID',
+    doctor_id         BIGINT      NOT NULL COMMENT '医生ID',
+    status            VARCHAR(20) NOT NULL DEFAULT 'OPEN' COMMENT 'OPEN/CLOSED',
+    last_message      VARCHAR(500)         DEFAULT NULL COMMENT '最后一条消息',
+    last_message_time DATETIME             DEFAULT NULL COMMENT '最后消息时间',
+    unread_user       INT         NOT NULL DEFAULT 0 COMMENT '患者未读数',
+    unread_doctor     INT         NOT NULL DEFAULT 0 COMMENT '医生未读数',
+    create_time       DATETIME             DEFAULT NULL,
+    update_time       DATETIME             DEFAULT NULL,
+    deleted           TINYINT     NOT NULL DEFAULT 0,
+    PRIMARY KEY (id),
+    KEY idx_user_time (user_id, last_message_time),
+    KEY idx_doctor_time (doctor_id, last_message_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='医生咨询会话';
+
+-- ---------------------------
+-- 医生咨询消息
+-- ---------------------------
+DROP TABLE IF EXISTS doctor_consult_message;
+CREATE TABLE doctor_consult_message (
+    id              BIGINT      NOT NULL AUTO_INCREMENT,
+    session_id      BIGINT      NOT NULL COMMENT '会话ID',
+    user_id         BIGINT      NOT NULL COMMENT '患者用户ID',
+    doctor_id       BIGINT      NOT NULL COMMENT '医生ID',
+    sender_type     VARCHAR(20) NOT NULL COMMENT 'USER/DOCTOR',
+    message_type    VARCHAR(20) NOT NULL DEFAULT 'TEXT' COMMENT 'TEXT/ATTACHMENT',
+    content         TEXT                 DEFAULT NULL COMMENT '消息内容',
+    attachment_url  VARCHAR(255)         DEFAULT NULL COMMENT '附件URL',
+    attachment_name VARCHAR(255)         DEFAULT NULL COMMENT '附件名称',
+    read_flag       TINYINT     NOT NULL DEFAULT 0 COMMENT '0未读1已读',
+    create_time     DATETIME             DEFAULT NULL,
+    update_time     DATETIME             DEFAULT NULL,
+    deleted         TINYINT     NOT NULL DEFAULT 0,
+    PRIMARY KEY (id),
+    KEY idx_session_time (session_id, create_time),
+    KEY idx_user_time (user_id, create_time),
+    KEY idx_doctor_time (doctor_id, create_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='医生咨询消息';
 
 -- ---------------------------
 -- 健康咨询记录(AI)
@@ -297,3 +346,23 @@ VALUES
 ('冯建国', '主任医师',   '市老年病医院',   '老年医学科', '阿尔茨海默病、老年营养、跌倒预防', '主编《老年综合征管理手册》，深耕老年痴呆早期干预15年。', 1, NOW(), NOW(), 0),
 ('钱美玲', '副主任医师', '市康复医院',     '康复医学科', '偏瘫康复、骨折术后康复、慢性疼痛', '擅长老年脑卒中与骨折术后的系统康复训练，从业16年。', 1, NOW(), NOW(), 0),
 ('谢文斌', '主任医师',   '市第二人民医院', '泌尿外科',   '前列腺增生、泌尿系结石、尿失禁', '擅长老年前列腺疾病微创手术，累计完成手术2000余例。', 1, NOW(), NOW(), 0);
+
+-- 按医生记录顺序分配 doctor1、doctor2 ... 登录账号，密码均为 123456。
+INSERT INTO sys_user (username, password, nickname, role, points, status, gender, create_time, update_time, deleted)
+SELECT CONCAT('doctor', ranked.seq),
+       '$2b$10$D2ZEKoZtHLLfSbUPrLBZkeev.sOTaYzMIrQeKhRERdLW6G2tkbYZS',
+       ranked.name, 'DOCTOR', 0, 0, 0, NOW(), NOW(), 0
+FROM (
+    SELECT id, name, ROW_NUMBER() OVER (ORDER BY id) AS seq
+    FROM doctor
+    WHERE deleted = 0
+) ranked;
+
+UPDATE doctor d
+JOIN (
+    SELECT id, ROW_NUMBER() OVER (ORDER BY id) AS seq
+    FROM doctor
+    WHERE deleted = 0
+) ranked ON ranked.id = d.id
+JOIN sys_user u ON u.username = CONCAT('doctor', ranked.seq)
+SET d.user_id = u.id, d.audit_status = 'APPROVED', d.status = 1;

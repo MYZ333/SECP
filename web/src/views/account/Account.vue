@@ -48,8 +48,16 @@ import { useUserStore } from '@/store/user'
 const router = useRouter(), userStore = useUserStore()
 const tab = ref('profile'), profile = ref({}), pwd = ref({ oldPassword: '', newPassword: '' })
 const uploading = ref(false)
-onMounted(async () => { profile.value = (await getMe()).data })
-async function saveProfile() { await updateProfile(profile.value); ElMessage.success('保存成功') }
+onMounted(async () => {
+  profile.value = (await getMe()).data
+  userStore.updateUserInfo(profile.value)
+})
+async function saveProfile() {
+  const res = await updateProfile(profile.value)
+  profile.value = res.data
+  userStore.updateUserInfo(res.data)
+  ElMessage.success('保存成功')
+}
 
 /** 头像上传：成功后回填 URL，点“保存资料”落库 */
 async function doUpload({ file }) {
