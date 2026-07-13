@@ -1,0 +1,88 @@
+# 智慧医养平台 · 一键部署编排
+# 用法：把整个项目上传到服务器，进入 deploy 目录，执行：
+#   docker compose up -d --build
+# 四个容器：mysql / redis / backend / web(nginx)
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: hda-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: hda_db
+      TZ: Asia/Shanghai
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_general_ci
+    volumes:
+      - mysql-data:/var/lib/mysql
+      # 首次启动自动执行建库脚本（仅当数据目录为空时执行一次）
+      - ../backend/src/main/resources/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${DB_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: hda-redis
+    restart: always
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.backend
+    container_name: hda-backend
+    restart: always
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      # 数据库：容器内用服务名 mysql 作为主机
+      DB_USERNAME: root
+      DB_PASSWORD: ${DB_PASSWORD}
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/hda_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+      # Redis 主机改为服务名 redis
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      # 安全密钥（务必在 .env 里改成你自己的）
+      JWT_SECRET: ${JWT_SECRET}
+      HDA_AES_KEY: ${HDA_AES_KEY}
+      # 阿里云短信（没有就留空，走 mock 模式打印验证码到日志）
+      SMS_ACCESS_KEY_ID: ${SMS_ACCESS_KEY_ID}
+      SMS_ACCESS_KEY_SECRET: ${SMS_ACCESS_KEY_SECRET}
+      SMS_SIGN_NAME: ${SMS_SIGN_NAME}
+      SMS_TEMPLATE_CODE: ${SMS_TEMPLATE_CODE}
+      # AI 模型（没接就留占位，健康咨询返回占位文案）
+      AI_BASE_URL: ${AI_BASE_URL}
+      AI_API_KEY: ${AI_API_KEY}
+      AI_MODEL: ${AI_MODEL}
+      UPLOAD_DIR: /app/uploads
+    volumes:
+      - ./uploads:/app/uploads
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.web
+    container_name: hda-web
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      # 左边是服务器对外端口，先用 80。有域名+HTTPS 后可改由宝塔/证书处理
+      - "80:80"
+
+volumes:
+  mysql-data:
+  redis-data:
