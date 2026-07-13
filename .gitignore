@@ -64,4 +64,14 @@ out/
 build/
 dist/
 .cache/
+
 uploads/avatar/
+
+
+# ---------- RAG 本机运行数据（保留 data/rag/input 示例语料） ----------
+data/rag/chroma/
+data/rag/documents/
+
+# ---------- Local product documentation (do not commit) ----------
+/PRODUCT.md
+/docs/

@@ -64,6 +64,84 @@ export const pageDoctors = (params) => request.get('/doctor/page', { params })
 export const getDoctorDepartments = () => request.get('/doctor/departments')
 export const consultChat = (data) => request.post('/consult/chat', data)
 export const consultHistory = (params) => request.get('/consult/history', { params })
+
+export const adminPageKnowledge = (params) => request.get('/admin/knowledge/page', { params })
+export const adminKnowledgeChunks = (id) => request.get(`/admin/knowledge/${id}/chunks`)
+export const adminUploadKnowledge = (formData) => request.post('/admin/knowledge', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+export const adminImportKnowledgeSeeds = () => request.post('/admin/knowledge/seed')
+export const adminPublishKnowledge = (id) => request.post(`/admin/knowledge/${id}/publish`)
+export const adminReindexKnowledge = (id) => request.post(`/admin/knowledge/${id}/reindex`)
+export const adminInactiveKnowledge = (id) => request.put(`/admin/knowledge/${id}/inactive`)
+export const adminPageApplicationKnowledge = (params) => request.get('/admin/knowledge/application/page', { params })
+export const adminUploadApplicationKnowledge = (formData) => request.post('/admin/knowledge/application', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+export const adminImportApplicationKnowledgeSeeds = () => request.post('/admin/knowledge/application/seed')
+
+// Axios 不直接消费浏览器 POST 响应流；AI 助手接口统一使用 fetch 解析 SSE。
+async function postSseStream (url, data, handlers, assistantName) {
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'text/event-stream',
+      ...(localStorage.getItem('token') ? { Authorization: `Bearer ${localStorage.getItem('token')}` } : {})
+    },
+    body: JSON.stringify(data),
+    signal: handlers.signal
+  })
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => null)
+    throw new Error(body?.message || `${assistantName}请求失败（HTTP ${response.status}）`)
+  }
+  if (!response.body) throw new Error('当前浏览器不支持流式响应')
+
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder('utf-8')
+  let buffer = ''
+
+  const consume = (block) => {
+    if (!block.trim()) return
+    let eventName = 'message'
+    const dataLines = []
+    block.split(/\r?\n/).forEach(line => {
+      if (line.startsWith('event:')) eventName = line.slice(6).trim()
+      if (line.startsWith('data:')) dataLines.push(line.slice(5).trimStart())
+    })
+    if (!dataLines.length) return
+    let event
+    try { event = JSON.parse(dataLines.join('\n')) } catch { throw new Error(`${assistantName}返回了无法识别的流式数据`) }
+    const type = event.type || eventName
+    if (type === 'meta') handlers.onMeta?.(event)
+    else if (type === 'stage') handlers.onStage?.(event)
+    else if (type === 'risk') handlers.onRisk?.(event)
+    else if (type === 'citation') handlers.onCitation?.(event.citation)
+    else if (type === 'delta') handlers.onDelta?.(event.content || '')
+    else if (type === 'done') handlers.onDone?.()
+    else if (type === 'error') throw new Error(event.content || `${assistantName}暂时不可用`)
+  }
+
+  try {
+    while (true) {
+      const { value, done } = await reader.read()
+      buffer += decoder.decode(value || new Uint8Array(), { stream: !done })
+      const blocks = buffer.split(/\r?\n\r?\n/)
+      buffer = blocks.pop() || ''
+      blocks.forEach(consume)
+      if (done) break
+    }
+    if (buffer.trim()) consume(buffer)
+  } finally {
+    reader.releaseLock()
+  }
+}
+
+export function consultChatStream (data, handlers = {}) {
+  return postSseStream('/api/consult/chat/stream', data, handlers, '健康助手')
+}
+
+export function applicationAssistantChatStream (data, handlers = {}) {
+  return postSseStream('/api/app-assistant/chat/stream', data, handlers, '应用助手')
+}
 export const startDoctorSession = (doctorId) => request.post(`/doctor-consult/session/${doctorId}`)
 export const pageDoctorConsultSessions = (params) => request.get('/doctor-consult/sessions', { params })
 export const getDoctorConsultMessages = (sessionId) => request.get(`/doctor-consult/session/${sessionId}/messages`)

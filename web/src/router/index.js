@@ -22,7 +22,8 @@ const routes = [
       { path: 'account', name: '账户管理', component: () => import('@/views/account/Account.vue') },
       { path: 'admin/user', name: '用户管理', component: () => import('@/views/admin/UserManage.vue'), meta: { admin: true } },
       { path: 'admin/product', name: '商品管理', component: () => import('@/views/admin/ProductManage.vue'), meta: { admin: true } },
-      { path: 'admin/doctor', name: '专家管理', component: () => import('@/views/admin/DoctorManage.vue'), meta: { admin: true } }
+      { path: 'admin/doctor', name: '专家管理', component: () => import('@/views/admin/DoctorManage.vue'), meta: { admin: true } },
+      { path: 'admin/knowledge', name: '健康知识库', component: () => import('@/views/admin/KnowledgeManage.vue'), meta: { admin: true } }
     ]
   }
 ]

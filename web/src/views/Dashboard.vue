@@ -10,20 +10,6 @@
     <!-- ============ 右侧滚动进度条（蓝紫渐变） ============ -->
     <div class="sprog" aria-hidden="true"><div class="sprog-bar" ref="progBar"></div></div>
 
-    <!-- ============ 常驻悬浮：健康工具箱 ============ -->
-    <div class="fab-wrap" :class="{ open: fabOpen }"
-         @mouseenter="fabOpen = true" @mouseleave="fabOpen = false" @focusin="fabOpen = true" @focusout="fabOpen = false">
-      <button class="fab" aria-label="健康工具箱">
-        <span class="fab-ic" v-html="ICONS.plus"></span>
-      </button>
-      <div class="fab-list">
-        <button v-for="(f, i) in fabs" :key="f.path" class="fab-item"
-                :style="{ transitionDelay: fabOpen ? i * 0.06 + 's' : '0s' }" @click="go(f.path)">
-          <span class="f-ic" v-html="f.icon"></span>{{ f.name }}
-        </button>
-      </div>
-    </div>
-
     <div class="dash-body">
       <!-- ============ 欢迎区 Hero ============ -->
       <section class="hero glass" ref="heroEl">
@@ -180,13 +166,6 @@ const quicks = computed(() => [
   { name: '健康预警', path: '/alert',          icon: ICONS.bell,    color: '#5D7189', span: 'c2', anim: 'a-bell',
     desc: raw.alert > 0 ? `${raw.alert} 条预警待处理，建议尽快查看` : '暂无未处理预警，各项指标平稳' },
 ])
-
-const fabOpen = ref(false)
-const fabs = [
-  { name: '记录体征', path: '/health/metric', icon: ICONS.activity },
-  { name: 'AI 咨询',  path: '/consult',       icon: ICONS.message },
-  { name: '查报告',   path: '/health/report', icon: ICONS.fileText },
-]
 
 function go(p) { router.push(p) }
 
@@ -405,31 +384,6 @@ onBeforeUnmount(() => {
   background: linear-gradient(180deg, var(--blue), var(--violet));
   transform: scaleY(0); transform-origin: top; will-change: transform;
 }
-
-/* ============ 健康工具箱悬浮按钮 ============ */
-.fab-wrap { position: fixed; top: 96px; right: 24px; z-index: 110; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
-.fab {
-  width: 52px; height: 52px; border-radius: 50%; border: none; cursor: pointer;
-  display: grid; place-items: center; color: #fff; background: #2fa37c;
-  box-shadow: var(--shadow);
-  transition: transform 0.4s var(--ease), box-shadow 0.4s var(--ease);
-}
-.fab-wrap.open .fab { transform: rotate(45deg); }
-.fab-ic { display: grid; place-items: center; width: 22px; height: 22px; }
-.fab-ic :deep(svg) { width: 22px; height: 22px; }
-.fab-list { display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
-.fab-item {
-  display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px;
-  border: 1px solid rgba(255, 255, 255, 0.65); border-radius: var(--r); cursor: pointer;
-  background: rgba(255, 255, 255, 0.78); backdrop-filter: blur(14px);
-  box-shadow: var(--shadow); color: var(--blue); font-size: 16px; font-weight: 600;
-  opacity: 0; transform: translateY(-8px) scale(0.94); pointer-events: none;
-  transition: opacity 0.4s var(--ease), transform 0.4s var(--ease);
-}
-.fab-wrap.open .fab-item { opacity: 1; transform: none; pointer-events: auto; }
-.fab-item:hover { color: var(--el-color-primary-dark-2); }
-.f-ic { display: grid; place-items: center; width: 18px; height: 18px; }
-.f-ic :deep(svg) { width: 18px; height: 18px; }
 
 /* ============ Hero ============ */
 .hero {

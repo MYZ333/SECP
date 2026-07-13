@@ -15,7 +15,7 @@ spring:
     url: jdbc:mysql://localhost:3306/hda_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
     # 生产环境用环境变量覆盖，勿把真实密码提交进仓库
     username: ${DB_USERNAME:root}
-    password: ${DB_PASSWORD:zb2733286389}
+    password: ${DB_PASSWORD:123456}
   data:
     redis:
       host: localhost
@@ -30,13 +30,33 @@ spring:
           min-idle: 0
   # Spring AI 骨架预留：由他人接入具体模型，这里给占位配置
   ai:
-    openai:
-      base-url: ${AI_BASE_URL:https://api.openai.com}
-      api-key: ${AI_API_KEY:sk-placeholder}
+    dashscope:
+      api-key: ${APIKEY}
       chat:
         options:
-          model: ${AI_MODEL:gpt-4o-mini}
+          model: ${AI_CHAT_MODEL:qwen3.7-plus}
+          multi-model: true
           temperature: 0.7
+      embedding:
+        options:
+          model: ${AI_EMBEDDING_MODEL:text-embedding-v4}
+          dimensions: 1024
+    chat:
+      memory:
+        repository:
+          jdbc:
+            initialize-schema: never
+    vectorstore:
+      chroma:
+        client:
+          # Match start-chroma.ps1: use IPv4 explicitly to avoid localhost IPv4/IPv6 mismatch.
+          # Spring AI expects a complete base URL here, including the scheme.
+          host: ${CHROMA_HOST:http://127.0.0.1}
+          port: ${CHROMA_PORT:8000}
+        tenant-name: ${CHROMA_TENANT:default_tenant}
+        database-name: ${CHROMA_DATABASE:default_database}
+        collection-name: ${CHROMA_COLLECTION:medical_knowledge}
+        initialize-schema: ${CHROMA_INITIALIZE_SCHEMA:true}
 
 # MyBatis-Plus
 mybatis-plus:
@@ -54,6 +74,27 @@ mybatis-plus:
 
 # 自定义 JWT 配置
 hda:
+  agent:
+    rag:
+      enabled: ${RAG_ENABLED:true}
+      storage-dir: ${RAG_STORAGE_DIR:../data/rag/documents}
+      seed-dir: ${RAG_SEED_DIR:../data/rag/input}
+      chunking:
+        semantic-enabled: ${RAG_SEMANTIC_CHUNKING_ENABLED:true}
+        min-chars: ${RAG_CHUNK_MIN_CHARS:280}
+        max-chars: ${RAG_CHUNK_MAX_CHARS:1100}
+        breakpoint-percentile: ${RAG_CHUNK_BREAKPOINT_PERCENTILE:0.80}
+        minimum-break-distance: ${RAG_CHUNK_MINIMUM_BREAK_DISTANCE:0.12}
+      vector-top-k: ${RAG_VECTOR_TOP_K:30}
+      final-top-k: ${RAG_FINAL_TOP_K:5}
+      min-score: ${RAG_MIN_SCORE:0.35}
+    rerank:
+      enabled: ${RERANK_ENABLED:true}
+      workspace-id: ${AI_DASHSCOPE_WORKSPACE_ID:}
+      api-key: ${AI_DASHSCOPE_API_KEY:}
+      model: ${AI_RERANK_MODEL:qwen3-rerank}
+    orchestration:
+      worker-timeout-seconds: ${AGENT_WORKER_TIMEOUT_SECONDS:20}
   # 阿里云短信。四项配置齐全时发真实短信；任一为空则为 mock 模式（验证码打印到后端日志）
   sms:
     access-key-id: ${SMS_ACCESS_KEY_ID:}
