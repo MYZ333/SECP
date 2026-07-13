@@ -2,9 +2,10 @@ import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import router from '@/router'
 import { useUserStore } from '@/store/user'
+import { API_BASE_URL } from '@/config/server'
 
-const request = axios.create({ baseURL: '/api', timeout: 15000 })
-const rawAxios = axios.create({ baseURL: '/api', timeout: 15000 })
+const request = axios.create({ baseURL: API_BASE_URL, timeout: 15000 })
+const rawAxios = axios.create({ baseURL: API_BASE_URL, timeout: 15000 })
 
 request.interceptors.request.use(config => {
   const token = localStorage.getItem('doctorToken')

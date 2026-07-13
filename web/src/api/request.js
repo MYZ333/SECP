@@ -2,14 +2,15 @@ import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import router from '@/router'
 import { useUserStore } from '@/store/user'
+import { API_BASE_URL } from '@/config/server'
 
 const request = axios.create({
-  baseURL: '/api',
+  baseURL: API_BASE_URL,
   timeout: 15000
 })
 
 // 无拦截器的裸实例，专用于刷新令牌，避免拦截器递归
-const rawAxios = axios.create({ baseURL: '/api', timeout: 15000 })
+const rawAxios = axios.create({ baseURL: API_BASE_URL, timeout: 15000 })
 
 // 请求拦截：自动携带 JWT
 request.interceptors.request.use(config => {

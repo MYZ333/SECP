@@ -5,7 +5,7 @@
         <el-form :model="profile" label-width="100px" style="max-width:500px">
           <el-form-item label="头像">
             <div class="ava-row">
-              <el-avatar :size="72" :src="profile.avatar">
+              <el-avatar :size="72" :src="resolveServerUrl(profile.avatar)">
                 {{ (profile.nickname || profile.username || 'U').charAt(0) }}
               </el-avatar>
               <el-upload :show-file-list="false" accept="image/*" :http-request="doUpload">
@@ -45,6 +45,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getMe, updateProfile, changePassword, deactivate, uploadAvatar } from '@/api'
 import { useUserStore } from '@/store/user'
+import { resolveServerUrl } from '@/config/server'
 const router = useRouter(), userStore = useUserStore()
 const tab = ref('profile'), profile = ref({}), pwd = ref({ oldPassword: '', newPassword: '' })
 const uploading = ref(false)

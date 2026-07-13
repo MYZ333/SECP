@@ -8,7 +8,7 @@
     <div v-else class="profile-layout">
       <aside class="identity glass-panel">
         <div class="avatar-wrap">
-          <el-avatar :size="96" :src="form.avatar">{{ initial }}</el-avatar>
+          <el-avatar :size="96" :src="resolveServerUrl(form.avatar)">{{ initial }}</el-avatar>
           <el-upload :show-file-list="false" accept="image/*" :http-request="upload">
             <el-tooltip content="更换头像" placement="right">
               <el-button class="avatar-button" type="primary" circle :loading="uploading" aria-label="更换头像"><el-icon><Camera /></el-icon></el-button>
@@ -62,6 +62,7 @@ import { ElMessage } from 'element-plus'
 import { Camera, Check, OfficeBuilding, User } from '@element-plus/icons-vue'
 import { getMe, updateMe, uploadAvatar } from '@/api'
 import { useUserStore } from '@/store/user'
+import { resolveServerUrl } from '@/config/server'
 
 const userStore = useUserStore()
 const form = ref({})

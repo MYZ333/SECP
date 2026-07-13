@@ -75,3 +75,8 @@ data/rag/documents/
 # ---------- Local product documentation (do not commit) ----------
 /PRODUCT.md
 /docs/
+
+android/
+apk-output/
+.vite/
+

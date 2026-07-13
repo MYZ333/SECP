@@ -58,6 +58,7 @@ import { ArrowDown } from '@element-plus/icons-vue'
 import BrandLogo from '@/components/BrandLogo.vue'
 import { getMe, getStats } from '@/api'
 import { useUserStore } from '@/store/user'
+import { resolveServerUrl } from '@/config/server'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -74,7 +75,7 @@ const nav = [
 ]
 const displayName = computed(() => userStore.userInfo.nickname || doctor.value.name || userStore.userInfo.username || '医生')
 const initial = computed(() => displayName.value.charAt(0))
-const userAvatar = computed(() => userStore.userInfo.avatar || doctor.value.avatar || '')
+const userAvatar = computed(() => resolveServerUrl(userStore.userInfo.avatar || doctor.value.avatar))
 const currentDate = new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' })
 const onScroll = () => { scrolled.value = window.scrollY > 60 }
 

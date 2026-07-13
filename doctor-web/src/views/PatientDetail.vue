@@ -11,7 +11,7 @@
     <el-skeleton v-if="loading" animated :rows="8" class="detail-skeleton" />
     <template v-else-if="detail.patient">
       <section class="patient-summary glass-panel">
-        <el-avatar :size="72" :src="detail.patient.avatar">{{ patientInitial }}</el-avatar>
+        <el-avatar :size="72" :src="resolveServerUrl(detail.patient.avatar)">{{ patientInitial }}</el-avatar>
         <div class="patient-main">
           <div class="name-line"><h2>{{ detail.patient.nickname || detail.patient.username }}</h2><el-tag type="success">账户正常</el-tag></div>
           <p>{{ detail.patient.username }} · {{ genderText(detail.patient.gender) }} · {{ ageText }}</p>
@@ -84,6 +84,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ArrowLeft, Bell, DataLine, Document, FirstAidKit, Postcard } from '@element-plus/icons-vue'
 import { getPatientDetail } from '@/api'
+import { resolveServerUrl } from '@/config/server'
 
 const route = useRoute()
 const detail = ref({})

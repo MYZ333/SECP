@@ -52,7 +52,7 @@
     <div class="grid">
       <div class="prod" v-for="(p, i) in list" :key="p.id" v-reveal="i % 4">
         <div class="cover">
-          <el-image :src="p.image" fit="cover" style="width:100%;height:100%">
+          <el-image :src="resolveServerUrl(p.image)" fit="cover" style="width:100%;height:100%">
             <template #error><div class="img-ph"><el-icon :size="30"><Present /></el-icon></div></template>
           </el-image>
           <span class="badge">{{ p.pointsCost }} 积分</span>
@@ -83,6 +83,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { GoldMedal, Present } from '@element-plus/icons-vue'
 import { pagePointProducts, exchangeProduct, getPointBalance, checkIn, getPointTasks, claimTask, getProductCategories } from '@/api'
+import { resolveServerUrl } from '@/config/server'
 const router = useRouter()
 const list = ref([]), total = ref(0), balance = ref(0), tasks = ref([]), categories = ref([]), category = ref('')
 const query = ref({ pageNum: 1, pageSize: 8 })
