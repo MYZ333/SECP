@@ -62,11 +62,19 @@
         <span>按优先级处理今日工作</span>
       </div>
       <div class="quick-grid">
-        <button v-for="item in quickActions" :key="item.title" class="quick glass-panel" @click="$router.push(item.path)">
+        <button
+          v-for="item in quickActions"
+          :key="item.title"
+          class="quick glass-panel"
+          @click="$router.push(item.path)"
+          @pointermove="tilt"
+          @pointerleave="resetTilt"
+        >
           <span class="quick-icon"><el-icon><component :is="item.icon" /></el-icon></span>
           <span class="quick-copy"><b>{{ item.title }}</b><small>{{ item.description }}</small></span>
           <el-icon class="quick-arrow"><ArrowRight /></el-icon>
-          <i></i>
+          <span class="quick-glare"></span>
+          <span class="quick-border" aria-hidden="true"></span>
         </button>
       </div>
     </section>
@@ -160,15 +168,20 @@ function resetTilt(event) {
 .section-heading h2 { margin: 0; font-size: 22px; }
 .section-heading span { color: var(--hda-ink-soft); font-size: 14px; }
 .quick-grid { display: grid; grid-template-columns: 1.25fr 1fr 1fr; gap: 16px; }
-.quick { position: relative; min-height: 104px; overflow: hidden; padding: 22px 24px; border: 0; display: flex; align-items: center; gap: 16px; color: inherit; text-align: left; cursor: pointer; }
-.quick i { position: absolute; inset: 0; border: 1.5px solid transparent; pointer-events: none; transition: border-color .3s; }
-.quick:hover i { border-color: var(--el-color-primary-light-5); }
-.quick-icon { flex: 0 0 42px; width: 42px; height: 42px; display: grid; place-items: center; color: var(--el-color-primary); background: var(--el-color-primary-light-9); font-size: 24px; transition: transform .35s var(--ease-spring); }
+.quick { --rotate-x: 0deg; --rotate-y: 0deg; position: relative; min-height: 104px; overflow: hidden; padding: 22px 24px; border: 0; display: flex; align-items: center; gap: 16px; color: inherit; text-align: left; cursor: pointer; transform: perspective(900px) rotateX(var(--rotate-x)) rotateY(var(--rotate-y)); transition: transform .4s var(--ease-out), box-shadow .4s var(--ease-out); }
+.quick:hover { box-shadow: var(--hda-shadow), var(--hda-glass-inner); transform: perspective(900px) rotateX(var(--rotate-x)) rotateY(var(--rotate-y)) translateY(-3px); }
+.quick:active { transform: perspective(900px) rotateX(var(--rotate-x)) rotateY(var(--rotate-y)) translateY(0) scale(.985); transition-duration: .12s; }
+.quick:focus-visible { outline: 3px solid var(--el-color-primary-light-7); outline-offset: 2px; }
+.quick-glare { position: absolute; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(260px circle at var(--pointer-x, 50%) var(--pointer-y, 50%), rgba(46,111,224,.12), transparent 64%); transition: opacity .3s; }
+.quick:hover .quick-glare { opacity: 1; }
+.quick-border { position: absolute; inset: 0; border: 1.5px solid transparent; pointer-events: none; transition: border-color .3s; }
+.quick:hover .quick-border { border-color: var(--el-color-primary-light-5); }
+.quick-icon { position: relative; z-index: 1; flex: 0 0 42px; width: 42px; height: 42px; display: grid; place-items: center; color: var(--el-color-primary); background: var(--el-color-primary-light-9); font-size: 24px; transition: transform .35s var(--ease-spring); }
 .quick:hover .quick-icon { transform: scale(1.08) rotate(-4deg); }
-.quick-copy { min-width: 0; display: flex; flex-direction: column; }
+.quick-copy { position: relative; z-index: 1; min-width: 0; display: flex; flex-direction: column; }
 .quick-copy b { color: var(--hda-ink); font-size: 17px; }
 .quick-copy small { color: var(--hda-ink-soft); font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.quick-arrow { margin-left: auto; color: #AAB7C8; transition: transform .3s var(--ease-out), color .3s; }
+.quick-arrow { position: relative; z-index: 1; margin-left: auto; color: #AAB7C8; transition: transform .3s var(--ease-out), color .3s; }
 .quick:hover .quick-arrow { color: var(--el-color-primary); transform: translateX(4px); }
 @media (max-width: 1050px) { .hero-ecg { display: none; } .stats { grid-template-columns: repeat(2, 1fr); } .quick-grid { grid-template-columns: 1fr; } }
 @media (max-width: 620px) { .hero { min-height: 0; padding: 28px 22px; } .hero h1 { font-size: 31px; } .hero-actions { align-items: stretch; flex-direction: column; } .stats { grid-template-columns: 1fr 1fr; } .stat { min-height: 148px; padding: 19px; } .stat strong { font-size: 32px; } }

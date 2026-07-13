@@ -68,6 +68,7 @@ export const startDoctorSession = (doctorId) => request.post(`/doctor-consult/se
 export const pageDoctorConsultSessions = (params) => request.get('/doctor-consult/sessions', { params })
 export const getDoctorConsultMessages = (sessionId) => request.get(`/doctor-consult/session/${sessionId}/messages`)
 export const sendDoctorConsultMessage = (sessionId, data) => request.post(`/doctor-consult/session/${sessionId}/messages`, data)
+export const closeDoctorConsultSession = (sessionId) => request.put(`/doctor-consult/session/${sessionId}/close`)
 export const uploadConsultAttachment = (formData) => request.post('/file/consult-attachment', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
 export function doctorConsultWsUrl() {
   const token = localStorage.getItem('token') || ''

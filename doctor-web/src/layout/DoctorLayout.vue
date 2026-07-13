@@ -72,9 +72,9 @@ const nav = [
   { name: '咨询会话', path: '/sessions' },
   { name: '个人资料', path: '/profile' }
 ]
-const displayName = computed(() => doctor.value.name || userStore.userInfo.nickname || userStore.userInfo.username || '医生')
+const displayName = computed(() => userStore.userInfo.nickname || doctor.value.name || userStore.userInfo.username || '医生')
 const initial = computed(() => displayName.value.charAt(0))
-const userAvatar = computed(() => doctor.value.avatar || userStore.userInfo.avatar || '')
+const userAvatar = computed(() => userStore.userInfo.avatar || doctor.value.avatar || '')
 const currentDate = new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' })
 const onScroll = () => { scrolled.value = window.scrollY > 60 }
 

@@ -24,8 +24,17 @@ request.interceptors.request.use(config => {
 let isRefreshing = false
 let pendingQueue = []
 
-function flushQueue(newToken) {
-  pendingQueue.forEach(cb => cb(newToken))
+function flushQueue(error, newToken) {
+  pendingQueue.forEach(({ resolve, reject, config }) => {
+    if (error) {
+      reject(error)
+      return
+    }
+    config._retry = true
+    config.headers = config.headers || {}
+    config.headers['Authorization'] = 'Bearer ' + newToken
+    resolve(request(config))
+  })
   pendingQueue = []
 }
 
@@ -36,12 +45,59 @@ function forceLogout(payload) {
   return Promise.reject(payload)
 }
 
+async function handleUnauthorized(data, config) {
+  const userStore = useUserStore()
+
+  // 被挤下线 / token 被登出拉黑：直接退出，不刷新
+  if (data.code === 1101 || data.code === 1102) {
+    ElMessage.error(data.message || '登录状态已失效，请重新登录')
+    return forceLogout(data)
+  }
+  // 无 refreshToken，或刷新后仍未通过：退出
+  if (!userStore.refreshToken || config._retry) {
+    ElMessage.error(data.message || '登录已过期，请重新登录')
+    return forceLogout(data)
+  }
+  // 刷新进行中：本请求排队，等新 token 后重放
+  if (isRefreshing) {
+    return new Promise((resolve, reject) => {
+      pendingQueue.push({ resolve, reject, config })
+    })
+  }
+  // 发起刷新
+  isRefreshing = true
+  try {
+    const r = await rawAxios.post('/auth/refresh', { refreshToken: userStore.refreshToken })
+    const body = r.data
+    if (body.code === 200 && body.data && body.data.token) {
+      userStore.setLogin(body.data) // 轮换 access + refresh
+      const newToken = body.data.token
+      flushQueue(null, newToken)
+      config._retry = true
+      config.headers = config.headers || {}
+      config.headers['Authorization'] = 'Bearer ' + newToken
+      return request(config)
+    }
+    flushQueue(body)
+    return forceLogout(body)
+  } catch (e) {
+    flushQueue(e)
+    return forceLogout(e)
+  } finally {
+    isRefreshing = false
+  }
+}
+
 // 响应拦截
 request.interceptors.response.use(
-  response => {
+  async response => {
     const res = response.data
     if (res.code === 200) {
       return res
+    }
+    // 后端未认证入口当前返回 HTTP 200 + 业务码 401，也需要走 refreshToken 续期
+    if (res.code === 401) {
+      return handleUnauthorized(res, response.config)
     }
     // HTTP 200 但业务码非 200（如限流、幂等重复等）
     ElMessage.error(res.message || '请求失败')
@@ -63,47 +119,7 @@ request.interceptors.response.use(
     }
 
     if (status === 401) {
-      const userStore = useUserStore()
-
-      // 被挤下线 / token 被登出拉黑：直接退出，不刷新
-      if (data.code === 1101 || data.code === 1102) {
-        ElMessage.error(data.message || '登录状态已失效，请重新登录')
-        return forceLogout(data)
-      }
-      // 无 refreshToken，或刷新后仍 401：退出
-      if (!userStore.refreshToken || config._retry) {
-        ElMessage.error('登录已过期，请重新登录')
-        return forceLogout(data)
-      }
-      // 刷新进行中：本请求排队，等新 token 后重放
-      if (isRefreshing) {
-        return new Promise(resolve => {
-          pendingQueue.push(newToken => {
-            config._retry = true
-            config.headers['Authorization'] = 'Bearer ' + newToken
-            resolve(request(config))
-          })
-        })
-      }
-      // 发起刷新
-      isRefreshing = true
-      try {
-        const r = await rawAxios.post('/auth/refresh', { refreshToken: userStore.refreshToken })
-        const body = r.data
-        if (body.code === 200 && body.data && body.data.token) {
-          userStore.setLogin(body.data) // 轮换 access + refresh
-          const newToken = body.data.token
-          flushQueue(newToken)
-          config._retry = true
-          config.headers['Authorization'] = 'Bearer ' + newToken
-          return request(config)
-        }
-        return forceLogout(body)
-      } catch (e) {
-        return forceLogout(e)
-      } finally {
-        isRefreshing = false
-      }
+      return handleUnauthorized(data, config)
     }
 
     ElMessage.error(data.message || error.message || '请求失败')
