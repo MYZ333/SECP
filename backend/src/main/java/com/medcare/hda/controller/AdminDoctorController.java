@@ -68,7 +68,20 @@ public class AdminDoctorController {
     @Operation(summary = "删除专家")
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long id) {
+        Doctor doctor = service.getById(id);
+        if (doctor == null) {
+            return Result.success("删除成功", null);
+        }
+        Long userId = doctor.getUserId();
+        doctor.setName(doctor.getName() + "_del_" + id);
+        doctor.setPhone(null);
+        doctor.setUserId(null);
+        doctor.setStatus(0);
+        service.updateById(doctor);
         service.removeById(id);
+        if (userId != null) {
+            userService.deactivate(userId);
+        }
         return Result.success("删除成功", null);
     }
 }

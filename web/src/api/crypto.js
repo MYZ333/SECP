@@ -2,13 +2,9 @@ import { JSEncrypt } from 'jsencrypt'
 import request from './request'
 
 // 缓存后端 RSA 公钥，避免每次登录都请求
-let cachedPublicKey = null
-
 export async function getPublicKey() {
-  if (cachedPublicKey) return cachedPublicKey
   const res = await request.get('/auth/public-key')
-  cachedPublicKey = res.data.publicKey
-  return cachedPublicKey
+  return res.data.publicKey
 }
 
 /**

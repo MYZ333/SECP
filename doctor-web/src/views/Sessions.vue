@@ -6,7 +6,7 @@
         <p>接收患者消息并进行实时健康咨询。</p>
       </div>
       <div class="connection" :class="{ online: connected }">
-        <span></span>{{ connected ? '实时连接正常' : '正在重新连接' }}
+        <span></span>{{ connected ? '本端实时连接正常' : '正在重新连接' }}
       </div>
     </div>
 
@@ -43,9 +43,13 @@
           <header class="chat-head">
             <div class="patient-head">
               <el-avatar :size="44" :src="active.patient?.avatar">{{ patientInitial(active) }}</el-avatar>
-              <div><strong>{{ active.patient?.nickname || active.patient?.username }}</strong><p>{{ genderText(active.patient?.gender) }} · 实时医生咨询</p></div>
+              <div><strong>{{ active.patient?.nickname || active.patient?.username }}</strong><p>{{ genderText(active.patient?.gender) }} · {{ isClosed(active) ? '会话已结束' : '实时医生咨询' }}</p></div>
             </div>
-            <el-button plain @click="$router.push('/patients/' + active.patient.id)"><el-icon><Postcard /></el-icon>患者详情</el-button>
+            <div class="head-actions">
+              <el-tag :type="isClosed(active) ? 'info' : 'success'">{{ isClosed(active) ? '已结束' : '进行中' }}</el-tag>
+              <el-button plain @click="$router.push('/patients/' + active.patient.id)"><el-icon><Postcard /></el-icon>患者详情</el-button>
+              <el-button v-if="!isClosed(active)" plain type="danger" @click="closeActiveSession">结束会话</el-button>
+            </div>
           </header>
 
           <div ref="messageBox" v-loading="loadingMessages" class="messages">
@@ -69,11 +73,11 @@
           <footer class="composer">
             <el-upload :show-file-list="false" :http-request="upload" accept="image/*,.pdf,.doc,.docx">
               <el-tooltip content="发送附件" placement="top">
-                <el-button class="icon-button" :loading="uploading" aria-label="发送附件"><el-icon><Paperclip /></el-icon></el-button>
+                <el-button class="icon-button" :disabled="isClosed(active)" :loading="uploading" aria-label="发送附件"><el-icon><Paperclip /></el-icon></el-button>
               </el-tooltip>
             </el-upload>
-            <el-input v-model="text" size="large" placeholder="输入回复内容，按 Enter 发送" @keyup.enter="send" />
-            <el-button type="primary" size="large" :disabled="!text.trim()" @click="send"><el-icon><Promotion /></el-icon>发送</el-button>
+            <el-input v-model="text" size="large" :disabled="isClosed(active)" :placeholder="isClosed(active) ? '会话已结束，不能继续发送消息' : '输入回复内容，按 Enter 发送'" @keyup.enter="send" />
+            <el-button type="primary" size="large" :disabled="isClosed(active) || !text.trim()" @click="send"><el-icon><Promotion /></el-icon>发送</el-button>
           </footer>
         </template>
 
@@ -89,9 +93,9 @@
 
 <script setup>
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { ChatDotRound, Document, Paperclip, Postcard, Promotion, Refresh } from '@element-plus/icons-vue'
-import { doctorWsUrl, getSessionMessages, pageSessions, sendSessionMessage, uploadAttachment } from '@/api'
+import { closeSession, doctorWsUrl, getSessionMessages, pageSessions, sendSessionMessage, uploadAttachment } from '@/api'
 
 const sessions = ref([])
 const active = ref(null)
@@ -130,7 +134,7 @@ async function select(item) {
 }
 
 async function send() {
-  if (!active.value || !text.value.trim()) return
+  if (!active.value || isClosed(active.value) || !text.value.trim()) return
   const content = text.value.trim()
   text.value = ''
   const res = await sendSessionMessage(active.value.session.id, { content })
@@ -140,7 +144,7 @@ async function send() {
 }
 
 async function upload({ file }) {
-  if (!active.value) return
+  if (!active.value || isClosed(active.value)) return
   uploading.value = true
   try {
     const formData = new FormData()
@@ -165,6 +169,12 @@ function connectWebSocket() {
   websocket.onopen = () => { connected.value = true }
   websocket.onmessage = async event => {
     const payload = JSON.parse(event.data)
+    if (payload.type === 'DOCTOR_CONSULT_SESSION_CLOSED') {
+      markSessionClosed(payload.data?.id)
+      ElMessage.info('当前咨询会话已结束')
+      await loadSessions()
+      return
+    }
     if (payload.type !== 'DOCTOR_CONSULT_MESSAGE') return
     const message = payload.data
     if (active.value?.session.id === message.sessionId && !messages.value.some(item => item.id === message.id)) {
@@ -181,6 +191,40 @@ function connectWebSocket() {
   }
 }
 
+async function closeActiveSession() {
+  if (!active.value || isClosed(active.value)) return
+  try {
+    await ElMessageBox.confirm('结束后双方将不能继续发送消息，但仍可查看历史记录。确定结束该咨询会话吗？', '结束会话', {
+      type: 'warning',
+      confirmButtonText: '结束会话',
+      cancelButtonText: '取消'
+    })
+    const res = await closeSession(active.value.session.id)
+    active.value = res.data
+    markSessionClosed(res.data.session.id)
+    await loadSessions()
+    ElMessage.success('会话已结束')
+  } catch (e) {
+    if (e !== 'cancel' && e !== 'close') throw e
+  }
+}
+
+function markSessionClosed(sessionId) {
+  if (!sessionId) return
+  const item = sessions.value.find(record => record.session.id === sessionId)
+  if (item) {
+    item.session.status = 'CLOSED'
+    item.session.lastMessage = '[会话已结束]'
+    item.session.unreadDoctor = 0
+  }
+  if (active.value?.session.id === sessionId) {
+    active.value.session.status = 'CLOSED'
+    active.value.session.lastMessage = '[会话已结束]'
+    active.value.session.unreadDoctor = 0
+  }
+}
+
+function isClosed(item) { return item?.session?.status === 'CLOSED' }
 function scrollToBottom() { nextTick(() => { if (messageBox.value) messageBox.value.scrollTop = messageBox.value.scrollHeight }) }
 function patientInitial(item) { return (item.patient?.nickname || item.patient?.username || '患').charAt(0) }
 function genderText(value) { return value === 1 ? '男' : value === 2 ? '女' : '性别保密' }
@@ -202,9 +246,11 @@ onBeforeUnmount(() => {
 .connection.online { color: var(--el-color-success); }
 .connection.online span { box-shadow: 0 0 0 5px rgba(47,163,124,.12); animation: connection-pulse 2s ease-in-out infinite; }
 @keyframes connection-pulse { 50% { box-shadow: 0 0 0 8px rgba(47,163,124,0); } }
-.chat-shell { height: calc(100dvh - 158px); min-height: 610px; overflow: hidden; }
-.chat-shell :deep(.el-card__body) { height: 100%; padding: 0; display: grid; grid-template-columns: 330px 1fr; }
-.session-list { min-width: 0; overflow-y: auto; border-right: 1px solid var(--hda-line); background: rgba(247,250,253,.54); }
+.sessions-page { height: calc(100dvh - 120px); overflow: hidden; display: flex; flex-direction: column; }
+.sessions-page .page-heading { flex: 0 0 auto; }
+.chat-shell { flex: 1; min-height: 0; overflow: hidden; }
+.chat-shell :deep(.el-card__body) { height: 100%; min-height: 0; padding: 0; display: grid; grid-template-columns: 330px 1fr; }
+.session-list { min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; border-right: 1px solid var(--hda-line); background: rgba(247,250,253,.54); }
 .list-head { position: sticky; top: 0; z-index: 2; min-height: 66px; padding: 0 18px; border-bottom: 1px solid var(--hda-line); background: rgba(255,255,255,.88); backdrop-filter: blur(12px); display: flex; align-items: center; justify-content: space-between; }
 .list-head b { color: var(--hda-ink); font-size: 17px; }
 .list-head span { margin-left: 8px; color: #93A2B5; font-size: 13px; }
@@ -222,13 +268,14 @@ onBeforeUnmount(() => {
 .session-skeleton { height: 70px; display: flex; align-items: center; gap: 12px; }
 .session-skeleton > .el-skeleton__item { width: 40px; height: 40px; }
 .session-skeleton div { flex: 1; }
-.chat-panel { min-width: 0; display: flex; flex-direction: column; background: rgba(255,255,255,.42); }
+.chat-panel { min-width: 0; min-height: 0; display: flex; flex-direction: column; background: rgba(255,255,255,.42); }
 .chat-head { min-height: 72px; padding: 0 22px; border-bottom: 1px solid var(--hda-line); display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,.74); }
+.head-actions { display: flex; align-items: center; gap: 10px; }
 .patient-head { display: flex; align-items: center; gap: 12px; }
 .patient-head .el-avatar { color: var(--el-color-primary); background: var(--el-color-primary-light-9); font-weight: 700; }
 .patient-head strong { color: var(--hda-ink); font-size: 18px; }
 .patient-head p { margin: 0; color: var(--hda-ink-soft); font-size: 13px; }
-.messages { flex: 1; overflow-y: auto; padding: 24px; background-image: linear-gradient(rgba(223,231,242,.26) 1px, transparent 1px), linear-gradient(90deg, rgba(223,231,242,.26) 1px, transparent 1px); background-size: 32px 32px; }
+.messages { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 24px; background-image: linear-gradient(rgba(223,231,242,.26) 1px, transparent 1px), linear-gradient(90deg, rgba(223,231,242,.26) 1px, transparent 1px); background-size: 32px 32px; }
 .message-row { margin: 14px 0; display: flex; align-items: flex-end; gap: 9px; }
 .message-row.mine { justify-content: flex-end; }
 .message-row .el-avatar { flex: 0 0 auto; color: var(--el-color-primary); background: var(--el-color-primary-light-9); font-size: 12px; }

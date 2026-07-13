@@ -262,6 +262,7 @@ async function doReset() {
 }
 
 async function doRegister() {
+  if (regForm.value.password.length < 6 || regForm.value.password.length > 32) return ElMessage.warning('密码长度为6-32位')
   loading.value = true
   try {
     await register(regForm.value)

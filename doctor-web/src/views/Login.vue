@@ -153,6 +153,7 @@ async function doLogin() {
 async function doRegister() {
   const required = ['username', 'password', 'name', 'hospital', 'department', 'title']
   if (required.some(key => !String(regForm.value[key] || '').trim())) return ElMessage.warning('请填写全部必填信息')
+  if (regForm.value.password.length < 6 || regForm.value.password.length > 32) return ElMessage.warning('密码长度为6-32位')
   loading.value = true
   try {
     await registerDoctor(regForm.value)

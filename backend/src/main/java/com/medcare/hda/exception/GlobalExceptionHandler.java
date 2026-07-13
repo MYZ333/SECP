@@ -12,6 +12,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /** 全局异常处理 */
 @Slf4j
@@ -39,6 +40,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AuthenticationException.class)
     public Result<Void> handleAuth(AuthenticationException e) {
         return Result.fail(ResultCode.UNAUTHORIZED);
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public Result<Void> handleNoResource(NoResourceFoundException e) {
+        return Result.fail(ResultCode.NOT_FOUND.getCode(), "接口不存在，请确认后端服务已加载最新代码");
     }
 
     /** 唯一键冲突：如手机号/用户名已被占用 */

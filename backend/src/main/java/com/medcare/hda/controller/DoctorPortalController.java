@@ -157,6 +157,7 @@ public class DoctorPortalController {
     public Result<DoctorConsultMessage> send(@PathVariable Long sessionId,
                                              @Valid @RequestBody DoctorConsultMessageDTO dto) {
         DoctorConsultSession session = checkDoctorSession(sessionId);
+        ensureOpenSession(session);
         DoctorConsultMessage msg = new DoctorConsultMessage();
         msg.setSessionId(session.getId());
         msg.setUserId(session.getUserId());
@@ -179,6 +180,15 @@ public class DoctorPortalController {
         return Result.success("发送成功", msg);
     }
 
+    @Operation(summary = "医生结束咨询会话")
+    @PutMapping("/session/{sessionId}/close")
+    public Result<DoctorConsultSessionVO> closeSession(@PathVariable Long sessionId) {
+        DoctorConsultSession session = checkDoctorSession(sessionId);
+        closeSessionIfOpen(session);
+        notifier.notifyUser(session.getUserId(), "DOCTOR_CONSULT_SESSION_CLOSED", session);
+        return Result.success("会话已结束", toVO(session));
+    }
+
     private Doctor currentDoctor() {
         if (!"DOCTOR".equals(SecurityUtil.getLoginUser().getRole())) {
             throw new BusinessException(ResultCode.FORBIDDEN);
@@ -199,6 +209,24 @@ public class DoctorPortalController {
             throw new BusinessException(ResultCode.FORBIDDEN);
         }
         return session;
+    }
+
+    private void ensureOpenSession(DoctorConsultSession session) {
+        if (!"OPEN".equals(session.getStatus())) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "会话已结束，不能继续发送消息");
+        }
+    }
+
+    private void closeSessionIfOpen(DoctorConsultSession session) {
+        if (!"OPEN".equals(session.getStatus())) {
+            return;
+        }
+        session.setStatus("CLOSED");
+        session.setLastMessage("[会话已结束]");
+        session.setLastMessageTime(LocalDateTime.now());
+        session.setUnreadDoctor(0);
+        session.setUnreadUser(0);
+        sessionService.updateById(session);
     }
 
     private DoctorConsultSessionVO toVO(DoctorConsultSession session) {

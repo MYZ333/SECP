@@ -50,7 +50,8 @@ public class DoctorConsultController {
         DoctorConsultSession session = sessionService.getOne(Wrappers.<DoctorConsultSession>lambdaQuery()
                 .eq(DoctorConsultSession::getUserId, userId)
                 .eq(DoctorConsultSession::getDoctorId, doctorId)
-                .eq(DoctorConsultSession::getStatus, "OPEN")
+                .orderByDesc(DoctorConsultSession::getLastMessageTime)
+                .orderByDesc(DoctorConsultSession::getId)
                 .last("LIMIT 1"));
         if (session == null) {
             session = new DoctorConsultSession();
@@ -61,6 +62,13 @@ public class DoctorConsultController {
             session.setUnreadUser(0);
             session.setLastMessageTime(LocalDateTime.now());
             sessionService.save(session);
+        } else if (!"OPEN".equals(session.getStatus())) {
+            session.setStatus("OPEN");
+            session.setLastMessage("会话已重新开启");
+            session.setLastMessageTime(LocalDateTime.now());
+            session.setUnreadDoctor(0);
+            session.setUnreadUser(0);
+            sessionService.updateById(session);
         }
         return Result.success(toVO(session));
     }
@@ -92,6 +100,7 @@ public class DoctorConsultController {
     public Result<DoctorConsultMessage> send(@PathVariable Long sessionId,
                                              @Valid @RequestBody DoctorConsultMessageDTO dto) {
         DoctorConsultSession session = checkPatientSession(sessionId);
+        ensureOpenSession(session);
         DoctorConsultMessage msg = newMessage(session, "USER", dto);
         messageService.save(msg);
         session.setLastMessage(summaryOf(msg));
@@ -106,12 +115,42 @@ public class DoctorConsultController {
         return Result.success("发送成功", msg);
     }
 
+    @Operation(summary = "患者结束咨询会话")
+    @PutMapping("/session/{sessionId}/close")
+    public Result<DoctorConsultSessionVO> close(@PathVariable Long sessionId) {
+        DoctorConsultSession session = checkPatientSession(sessionId);
+        closeSessionIfOpen(session);
+        Doctor doctor = doctorService.getById(session.getDoctorId());
+        if (doctor != null && doctor.getUserId() != null) {
+            notifier.notifyUser(doctor.getUserId(), "DOCTOR_CONSULT_SESSION_CLOSED", session);
+        }
+        return Result.success("会话已结束", toVO(session));
+    }
+
     private DoctorConsultSession checkPatientSession(Long sessionId) {
         DoctorConsultSession session = sessionService.getById(sessionId);
         if (session == null || !session.getUserId().equals(SecurityUtil.getUserId())) {
             throw new BusinessException(ResultCode.FORBIDDEN);
         }
         return session;
+    }
+
+    private void ensureOpenSession(DoctorConsultSession session) {
+        if (!"OPEN".equals(session.getStatus())) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "会话已结束，不能继续发送消息");
+        }
+    }
+
+    private void closeSessionIfOpen(DoctorConsultSession session) {
+        if (!"OPEN".equals(session.getStatus())) {
+            return;
+        }
+        session.setStatus("CLOSED");
+        session.setLastMessage("[会话已结束]");
+        session.setLastMessageTime(LocalDateTime.now());
+        session.setUnreadDoctor(0);
+        session.setUnreadUser(0);
+        sessionService.updateById(session);
     }
 
     private DoctorConsultMessage newMessage(DoctorConsultSession session, String senderType, DoctorConsultMessageDTO dto) {
