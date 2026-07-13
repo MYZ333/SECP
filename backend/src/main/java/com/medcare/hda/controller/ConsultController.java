@@ -1,81 +1,86 @@
 package com.medcare.hda.controller;
 
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.medcare.hda.agent.api.AgentChatResponse;
+import com.medcare.hda.agent.api.AgentHistoryMessage;
+import com.medcare.hda.agent.api.AgentStreamEvent;
+import com.medcare.hda.agent.core.AgentConversation;
+import com.medcare.hda.agent.core.HealthAssistantAgentService;
+import com.medcare.hda.agent.repository.AgentConversationRepository;
 import com.medcare.hda.annotation.RateLimit;
 import com.medcare.hda.common.PageResult;
 import com.medcare.hda.common.Result;
 import com.medcare.hda.common.ratelimit.LimitDimension;
 import com.medcare.hda.dto.ChatDTO;
-import com.medcare.hda.entity.ConsultRecord;
 import com.medcare.hda.security.SecurityUtil;
-import com.medcare.hda.service.AiChatService;
 import com.medcare.hda.service.AsyncTaskService;
-import com.medcare.hda.service.ConsultRecordService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.util.StringUtils;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.http.MediaType;
+import org.springframework.http.codec.ServerSentEvent;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import reactor.core.publisher.Flux;
 
-import java.util.UUID;
-
-@Tag(name = "健康咨询", description = "AI模块-健康咨询对话")
+@Tag(name = "健康咨询", description = "健康助手 Agent 对话")
 @RestController
 @RequestMapping("/api/consult")
 @RequiredArgsConstructor
 public class ConsultController {
 
-    private final AiChatService aiChatService;
-    private final ConsultRecordService consultRecordService;
+    private final HealthAssistantAgentService healthAssistantAgentService;
+    private final AgentConversationRepository conversationRepository;
     private final AsyncTaskService asyncTaskService;
 
-    @Operation(summary = "发起健康咨询")
+    @Operation(summary = "发起健康咨询（同步兼容接口）")
     @RateLimit(key = "ai-consult", window = 60, limit = 10, dimension = LimitDimension.USER,
             message = "AI 咨询太频繁，请稍后再问")
     @PostMapping("/chat")
-    public Result<ConsultRecord> chat(@Valid @RequestBody ChatDTO dto) {
+    public Result<AgentChatResponse> chat(@Valid @RequestBody ChatDTO dto) {
         Long userId = SecurityUtil.getUserId();
-        String sessionId = StringUtils.hasText(dto.getSessionId())
-                ? dto.getSessionId() : UUID.randomUUID().toString();
-
-        // 保存用户消息
-        ConsultRecord userMsg = new ConsultRecord();
-        userMsg.setUserId(userId);
-        userMsg.setSessionId(sessionId);
-        userMsg.setRole("user");
-        userMsg.setContent(dto.getMessage());
-        consultRecordService.save(userMsg);
-
-        // 积分任务: 完成AI健康咨询后标记为"待领取"（异步，不阻塞主链路的 AI 应答）
+        AgentConversation conversation = healthAssistantAgentService.prepareConversation(userId, dto.getSessionId());
+        AgentChatResponse response = healthAssistantAgentService.chat(userId, conversation, dto.getMessage(), dto.isUseHealthProfile());
         asyncTaskService.markTaskReadyAsync(userId, "CONSULT");
-
-        // 调用 AI（骨架, 占位）
-        String answer = aiChatService.consult(userId, sessionId, dto.getMessage());
-
-        // 保存 AI 回复
-        ConsultRecord aiMsg = new ConsultRecord();
-        aiMsg.setUserId(userId);
-        aiMsg.setSessionId(sessionId);
-        aiMsg.setRole("assistant");
-        aiMsg.setContent(answer);
-        consultRecordService.save(aiMsg);
-
-        return Result.success(aiMsg);
+        return Result.success(response);
     }
 
-    @Operation(summary = "咨询历史(分页)")
-    @GetMapping("/history")
-    public Result<PageResult<ConsultRecord>> history(@RequestParam(required = false) String sessionId,
-                                                     @RequestParam(defaultValue = "1") long pageNum,
-                                                     @RequestParam(defaultValue = "20") long pageSize) {
+    @Operation(summary = "发起健康咨询（SSE 流式接口）")
+    @RateLimit(key = "ai-consult", window = 60, limit = 10, dimension = LimitDimension.USER,
+            message = "AI 咨询太频繁，请稍后再问")
+    @PostMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<ServerSentEvent<AgentStreamEvent>> stream(@Valid @RequestBody ChatDTO dto,
+                                                          HttpServletResponse response) {
         Long userId = SecurityUtil.getUserId();
-        var page = consultRecordService.page(new Page<>(pageNum, pageSize),
-                Wrappers.<ConsultRecord>lambdaQuery()
-                        .eq(ConsultRecord::getUserId, userId)
-                        .eq(StringUtils.hasText(sessionId), ConsultRecord::getSessionId, sessionId)
-                        .orderByAsc(ConsultRecord::getCreateTime));
-        return Result.success(PageResult.of(page));
+        response.setHeader("Cache-Control", "no-cache, no-transform");
+        response.setHeader("X-Accel-Buffering", "no");
+        AgentConversation conversation = healthAssistantAgentService.prepareConversation(userId, dto.getSessionId());
+        return healthAssistantAgentService
+                .stream(userId, conversation, dto.getMessage(), dto.isUseHealthProfile())
+                .map(data -> event(data.type(), data))
+                .doOnComplete(() -> asyncTaskService.markTaskReadyAsync(userId, "CONSULT"))
+                .onErrorResume(error -> Flux.just(event("error",
+                        AgentStreamEvent.error("健康助手暂时不可用，请稍后再试"))));
+    }
+
+    @Operation(summary = "健康助手历史对话（分页）")
+    @GetMapping("/history")
+    public Result<PageResult<AgentHistoryMessage>> history(@RequestParam(required = false) String sessionId,
+                                                            @RequestParam(defaultValue = "1") long pageNum,
+                                                            @RequestParam(defaultValue = "20") long pageSize) {
+        Long userId = SecurityUtil.getUserId();
+        return Result.success(conversationRepository.pageHistory(userId, sessionId, pageNum, pageSize));
+    }
+
+    private ServerSentEvent<AgentStreamEvent> event(String name, AgentStreamEvent data) {
+        return ServerSentEvent.<AgentStreamEvent>builder()
+                .event(name)
+                .data(data)
+                .build();
     }
 }

@@ -13,4 +13,7 @@ public class ChatDTO {
 
     @Schema(description = "会话ID(可选, 用于多轮)")
     private String sessionId;
+
+    @Schema(description = "是否授权本次咨询读取当前用户的最小必要健康档案", defaultValue = "false")
+    private boolean useHealthProfile;
 }

@@ -28,6 +28,8 @@
           </template>
         </nav>
 
+        <ApplicationAssistant />
+
         <div class="user-wrap" @mouseenter="showSummary" @mouseleave="sumVisible = false" @click="sumVisible = false">
           <el-dropdown trigger="click" @command="onCommand">
             <span class="user">
@@ -88,6 +90,7 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import { getPointBalance, pageMetric, pageAlerts, logoutApi } from '@/api'
+import ApplicationAssistant from '@/components/ApplicationAssistant.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -159,6 +162,7 @@ const navList = computed(() => {
         { title: '用户管理', path: '/admin/user', desc: '平台用户与权限管理' },
         { title: '商品管理', path: '/admin/product', desc: '积分商城商品维护' },
         { title: '专家管理', path: '/admin/doctor', desc: '医生专家信息维护' },
+        { title: '智能体知识库', path: '/admin/knowledge', desc: '健康助手与应用助手资料分库管理' },
       ],
     })
   }
@@ -216,7 +220,7 @@ async function onCommand(cmd) {
 .logo-sub { font-size: 14px; color: #999; margin-left: 2px; padding-top: 6px; }
 
 /* 导航项（无图标） */
-.nav-items { display: flex; align-items: center; gap: 4px; flex: 1; height: 100%; }
+.nav-items { display: flex; align-items: center; gap: 4px; flex: 1; min-width: 0; height: 100%; overflow: hidden; }
 .nav-link {
   position: relative; display: flex; align-items: center; height: 64px;
   padding: 0 16px; font-size: 16px; color: #333; cursor: pointer;
@@ -242,6 +246,15 @@ async function onCommand(cmd) {
   color: #fff; font-weight: 700; font-size: 16px;
 }
 .uname { font-size: 15px; font-weight: 600; color: var(--hda-ink); }
+
+@media (max-width: 1280px) {
+  .nav-inner { gap: 16px; padding-inline: 18px; }
+  .nav-link { padding-inline: 10px; font-size: 15px; }
+}
+@media (max-width: 1050px) {
+  .logo-sub, .uname { display: none; }
+  .user { padding-inline: 4px; }
+}
 
 /* ============ 头像 hover：今日健康摘要卡 ============ */
 .user-wrap { position: relative; }

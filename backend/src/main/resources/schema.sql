@@ -366,3 +366,112 @@ JOIN (
 ) ranked ON ranked.id = d.id
 JOIN sys_user u ON u.username = CONCAT('doctor', ranked.seq)
 SET d.user_id = u.id, d.audit_status = 'APPROVED', d.status = 1;
+-- 健康助手 Agent 会话授权索引（消息正文由下方 SPRING_AI_CHAT_MEMORY 保存）
+CREATE TABLE IF NOT EXISTS agent_chat_session (
+    id              BIGINT       NOT NULL AUTO_INCREMENT,
+    user_id         BIGINT       NOT NULL,
+    session_id      VARCHAR(36)  NOT NULL,
+    conversation_id VARCHAR(36)  NOT NULL,
+    create_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_user_session (user_id, session_id),
+    UNIQUE KEY uk_conversation_id (conversation_id),
+    KEY idx_user_update_time (user_id, update_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='健康助手会话授权索引';
+
+-- Spring AI 1.0.9 JDBC 持久化对话记忆表
+CREATE TABLE IF NOT EXISTS SPRING_AI_CHAT_MEMORY (
+    conversation_id VARCHAR(36) NOT NULL,
+    content         TEXT NOT NULL,
+    type            ENUM('USER', 'ASSISTANT', 'SYSTEM', 'TOOL') NOT NULL,
+    timestamp       TIMESTAMP NOT NULL,
+    INDEX SPRING_AI_CHAT_MEMORY_CONVERSATION_ID_TIMESTAMP_IDX (conversation_id, timestamp)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Spring AI 持久化对话记忆';
+
+CREATE TABLE IF NOT EXISTS knowledge_document (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    agent_type VARCHAR(20) NOT NULL DEFAULT 'HEALTH',
+    title VARCHAR(200) NOT NULL,
+    source_org VARCHAR(120) NOT NULL,
+    source_url VARCHAR(1000) NOT NULL,
+    published_date DATE DEFAULT NULL,
+    version_no VARCHAR(60) DEFAULT NULL,
+    category VARCHAR(60) NOT NULL,
+    file_name VARCHAR(255) NOT NULL,
+    file_path VARCHAR(500) NOT NULL,
+    checksum VARCHAR(64) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'DRAFT',
+    chunk_count INT NOT NULL DEFAULT 0,
+    failure_reason VARCHAR(1000) DEFAULT NULL,
+    reviewer_id BIGINT DEFAULT NULL,
+    create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted TINYINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_knowledge_checksum (checksum),
+    KEY idx_knowledge_status (status, update_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='健康知识库文档';
+
+CREATE TABLE IF NOT EXISTS knowledge_chunk (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    document_id BIGINT NOT NULL,
+    chunk_no INT NOT NULL,
+    section_title VARCHAR(255) DEFAULT NULL,
+    content MEDIUMTEXT NOT NULL,
+    checksum VARCHAR(64) NOT NULL,
+    vector_id VARCHAR(64) DEFAULT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'DRAFT',
+    create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted TINYINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_document_chunk (document_id, chunk_no),
+    KEY idx_chunk_document_status (document_id, status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='健康知识库切片';
+
+CREATE TABLE IF NOT EXISTS agent_run (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    trace_id VARCHAR(36) NOT NULL,
+    user_id BIGINT NOT NULL,
+    session_id VARCHAR(36) NOT NULL,
+    route VARCHAR(100) DEFAULT NULL,
+    risk_level VARCHAR(20) DEFAULT NULL,
+    use_health_profile TINYINT NOT NULL DEFAULT 0,
+    status VARCHAR(20) NOT NULL,
+    latency_ms BIGINT DEFAULT NULL,
+    error_code VARCHAR(80) DEFAULT NULL,
+    create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_agent_trace (trace_id),
+    KEY idx_agent_user_session (user_id, session_id, create_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='健康智能体运行审计';
+
+CREATE TABLE IF NOT EXISTS agent_run_step (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    trace_id VARCHAR(36) NOT NULL,
+    agent_type VARCHAR(40) NOT NULL,
+    status VARCHAR(20) NOT NULL,
+    summary VARCHAR(1000) DEFAULT NULL,
+    latency_ms BIGINT DEFAULT NULL,
+    create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_agent_step_trace (trace_id, create_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='健康智能体执行步骤';
+
+CREATE TABLE IF NOT EXISTS agent_chat_turn (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    user_id BIGINT NOT NULL,
+    session_id VARCHAR(36) NOT NULL,
+    trace_id VARCHAR(36) NOT NULL,
+    question TEXT NOT NULL,
+    answer MEDIUMTEXT NOT NULL,
+    risk_level VARCHAR(20) DEFAULT NULL,
+    citations_json JSON DEFAULT NULL,
+    profile_categories_json JSON DEFAULT NULL,
+    create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_agent_turn_trace (trace_id),
+    KEY idx_agent_turn_session (user_id, session_id, create_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='健康智能体结构化对话轮次';
