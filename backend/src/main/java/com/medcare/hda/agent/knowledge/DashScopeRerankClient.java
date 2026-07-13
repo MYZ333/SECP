@@ -25,7 +25,7 @@ public class DashScopeRerankClient {
 
     public DashScopeRerankClient(@Value("${hda.agent.rerank.enabled:true}") boolean enabled,
                                  @Value("${hda.agent.rerank.workspace-id:}") String workspaceId,
-                                 @Value("${hda.agent.rerank.api-key:}") String apiKey,
+                                 @Value("${spring.ai.dashscope.api-key:}") String apiKey,
                                  @Value("${hda.agent.rerank.model:qwen3-rerank}") String model) {
         this.enabled = enabled;
         this.workspaceId = workspaceId;
