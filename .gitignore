@@ -75,3 +75,7 @@ data/rag/documents/
 # ---------- Local product documentation (do not commit) ----------
 /PRODUCT.md
 /docs/
+
+# ---------- Local planning and runtime uploads ----------
+/SECP/
+/backend/uploads/
