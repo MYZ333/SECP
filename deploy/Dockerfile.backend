@@ -1,0 +1,20 @@
+# ---------- 构建阶段：用 Maven 打 jar ----------
+FROM maven:3.9-eclipse-temurin-21 AS build
+WORKDIR /build
+# 先只拷 pom，利用 Docker 缓存加速依赖下载
+COPY backend/pom.xml .
+RUN mvn -q dependency:go-offline -B || true
+# 再拷源码打包（跳过测试，上线更快）
+COPY backend/src ./src
+RUN mvn -q clean package -DskipTests -B
+
+# ---------- 运行阶段：只带 JRE，镜像更小 ----------
+FROM eclipse-temurin:21-jre
+WORKDIR /app
+# 把打好的 jar 拷进来（pom 未改 finalName，默认 hda-backend-1.0.0.jar）
+COPY --from=build /build/target/hda-backend-1.0.0.jar app.jar
+# 头像等上传文件目录，挂载到宿主机做持久化
+VOLUME /app/uploads
+EXPOSE 8080
+# 生产用 prod 环境变量注入配置，时区设为上海
+ENTRYPOINT ["java","-Duser.timezone=Asia/Shanghai","-jar","app.jar"]
