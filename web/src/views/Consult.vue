@@ -58,6 +58,26 @@
               </section>
               <div class="bubble" :class="{ 'is-streaming': streaming && loading && index === messages.length - 1 && message.role === 'assistant' }"
                    v-html="message.role === 'assistant' ? renderMarkdown(message.content) : escapeHtml(message.content)"></div>
+              <section v-if="message.role === 'assistant' && message.intakeQuestion" class="intake-card"
+                       :class="{ answered: message.intakeAnswered }">
+                <div class="intake-card-title">问诊补充</div>
+                <strong>{{ message.intakeQuestion.prompt }}</strong>
+                <div class="intake-options">
+                  <button v-for="option in message.intakeQuestion.options" :key="option" type="button"
+                          :disabled="loading || message.intakeAnswered" @click="answerIntake(message, option)">
+                    {{ option }}
+                  </button>
+                </div>
+                <div v-if="message.intakeQuestion.allowFreeText" class="intake-free">
+                  <el-input v-model="message.intakeDraft" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }"
+                            resize="none" placeholder="以上选项不合适？请自由填写…"
+                            :disabled="loading || message.intakeAnswered"
+                            @keydown.enter.exact.prevent="answerIntake(message, message.intakeDraft)" />
+                  <button type="button" :disabled="loading || message.intakeAnswered || !message.intakeDraft?.trim()"
+                          @click="answerIntake(message, message.intakeDraft)">提交回答</button>
+                </div>
+                <div v-if="message.intakeAnswered" class="intake-selected">已回答：{{ message.selectedIntakeAnswer }}</div>
+              </section>
               <div v-if="message.role === 'assistant' && (message.riskLevel || message.usedProfileCategories?.length)" class="answer-meta">
                 <span v-if="message.riskLevel" class="risk-pill" :class="String(message.riskLevel).toLowerCase()">
                   <span class="risk-dot" aria-hidden="true"></span><span class="risk-prefix">风险评估</span><span>{{ riskLabel(message.riskLevel) }}</span>
@@ -95,7 +115,7 @@ import { ref, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ChatDotRound, Avatar, Promotion, Plus } from '@element-plus/icons-vue'
-import { consultChatStream, consultHistory } from '@/api'
+import { consultChatStream, consultHistory, consultSessions } from '@/api'
 
 const route = useRoute()
 const messages = ref([])
@@ -124,22 +144,13 @@ function saveSession(id) {
   localStorage.setItem(sessionStorageKey(), id)
 }
 
-function toSessionList(records) {
-  const grouped = new Map()
-  records.forEach(record => {
-    if (!record.sessionId) return
-    const item = grouped.get(record.sessionId) || { id: record.sessionId, title: '', time: '', last: '' }
-    if (!item.title && record.role === 'user') item.title = record.content || '新对话'
-    item.last = record.content || item.last
-    item.time = record.createTime ? String(record.createTime).replace('T', ' ').slice(0, 16) : item.time
-    grouped.set(record.sessionId, item)
-  })
-  return [...grouped.values()].reverse().map(item => ({ ...item, title: item.title || item.last || '新对话' }))
-}
-
 async function refreshSessions() {
-  const response = await consultHistory({ pageNum: 1, pageSize: 100 })
-  sessions.value = toSessionList(response.data.records || [])
+  const response = await consultSessions()
+  sessions.value = (response.data || []).map(item => ({
+    id: item.sessionId,
+    title: item.title || '新对话',
+    time: item.updateTime ? String(item.updateTime).replace('T', ' ').slice(0, 16) : ''
+  }))
 }
 
 async function selectSession(id) {
@@ -181,10 +192,16 @@ onMounted(async () => {
   if (typeof route.query.q === 'string' && route.query.q.trim()) text.value = route.query.q.trim()
 })
 
-async function send() {
-  if (!text.value.trim() || loading.value) return
-  const question = text.value.trim()
-  text.value = ''
+async function send(overrideMessage = '') {
+  const supplied = typeof overrideMessage === 'string' ? overrideMessage.trim() : ''
+  if ((!supplied && !text.value.trim()) || loading.value) return false
+  const question = supplied || text.value.trim()
+  if (!supplied) text.value = ''
+  const pendingIntake = [...messages.value].reverse().find(item => item.role === 'assistant' && item.intakeQuestion && !item.intakeAnswered)
+  if (pendingIntake) {
+    pendingIntake.intakeAnswered = true
+    pendingIntake.selectedIntakeAnswer = question
+  }
   messages.value.push({ role: 'user', content: question })
   const assistantIndex = messages.value.length
   messages.value.push({
@@ -195,6 +212,7 @@ async function send() {
   streaming.value = false
   abortController = new AbortController()
   scroll(true)
+  let succeeded = false
 
   try {
     await consultChatStream(
@@ -210,6 +228,13 @@ async function send() {
           queueStage(assistantIndex, event)
         },
         onRisk: event => { messages.value[assistantIndex].riskLevel = event.riskLevel },
+        onIntake: intakeQuestion => {
+          const assistant = messages.value[assistantIndex]
+          if (!assistant || !intakeQuestion) return
+          assistant.intakeQuestion = intakeQuestion
+          assistant.intakeDraft = ''
+          assistant.intakeAnswered = false
+        },
         onDelta: content => {
           const assistant = messages.value[assistantIndex]
           if (!assistant) return
@@ -223,6 +248,7 @@ async function send() {
     )
     if (!messages.value[assistantIndex]?.content) throw new Error('健康助手没有返回内容')
     await refreshSessions()
+    succeeded = true
   } catch (error) {
     const partial = messages.value[assistantIndex]?.content
     if (partial) {
@@ -238,6 +264,24 @@ async function send() {
     loading.value = false
     scroll()
   }
+  if (!succeeded && pendingIntake) {
+    pendingIntake.intakeAnswered = false
+    pendingIntake.selectedIntakeAnswer = ''
+  }
+  return succeeded
+}
+
+async function answerIntake(message, rawAnswer) {
+  if (loading.value || message.intakeAnswered) return
+  const answer = String(rawAnswer || '').trim()
+  if (!answer) return
+  message.intakeAnswered = true
+  message.selectedIntakeAnswer = answer
+  const succeeded = await send(answer)
+  if (!succeeded) {
+    message.intakeAnswered = false
+    message.selectedIntakeAnswer = ''
+  }
 }
 
 function saveProfilePreference(value) {
@@ -245,7 +289,7 @@ function saveProfilePreference(value) {
 }
 
 function stageName(stage) {
-  return ({ SAFETY_CHECK: '安全分诊', ROUTING: '任务调度', CONSULTING: '咨询分析', RETRIEVING: '权威检索', SYNTHESIZING: '整合回答' })[stage] || stage
+  return ({ SAFETY_CHECK: '安全分诊', CLARIFYING: '问诊补充', ROUTING: '任务调度', CONSULTING: '咨询分析', RETRIEVING: '权威检索', SYNTHESIZING: '整合回答' })[stage] || stage
 }
 
 function progressState(message) {
@@ -395,10 +439,11 @@ onBeforeUnmount(() => {
 .messages { flex: 1; overflow-y: auto; padding: 28px max(30px, calc((100% - 860px) / 2)); scroll-behavior: smooth; }.msg { display: flex; align-items: flex-start; gap: 11px; margin: 18px 0; }.msg.user { justify-content: flex-end; }.face { width: 32px; height: 32px; flex-shrink: 0; color: #2e6fe0; background: #eaf2ff; }.assistant-response { max-width: min(79%, 700px); }.bubble { max-width: min(79%, 700px); padding: 2px; color: #344862; font-size: 15px; line-height: 1.8; }.assistant-response .bubble { max-width: none; }.bubble :deep(p) { margin: 0; }.bubble :deep(.md-spacer) { height: 14px; }.bubble :deep(h3) { margin: 20px 0 7px; color: #263b59; font-size: 16px; font-weight: 700; line-height: 1.55; }.bubble :deep(h3:first-child) { margin-top: 0; }.bubble :deep(ol), .bubble :deep(ul) { margin: 7px 0 0; padding-left: 1.55em; }.bubble :deep(li) { margin: 4px 0; padding-left: 3px; }.bubble :deep(strong) { color: #263b59; font-weight: 700; }.bubble.is-streaming::after { content: ''; display: inline-block; width: 2px; height: 1.05em; margin-left: 4px; vertical-align: -.12em; background: #2e6fe0; animation: stream-caret .85s steps(1) infinite; }@keyframes stream-caret { 50% { opacity: 0; } }.msg.user .bubble { padding: 11px 15px; color: #fff; background: linear-gradient(135deg, #3e86ec, #2e6fe0); border-radius: 12px 12px 3px 12px; box-shadow: 0 7px 17px rgba(46,111,224,.18); }.msg.user .bubble :deep(*) { color: inherit; }.msg.user .assistant-response { display: flex; justify-content: flex-end; }
 .agent-progress { margin: 0 0 14px; border-bottom: 1px solid #dbe7f7; color: #46617f; }.progress-summary { width: 100%; display: flex; align-items: center; gap: 8px; padding: 0 0 10px; border: 0; color: #2e6fe0; background: transparent; cursor: pointer; font: 700 12px/1.4 var(--hda-font-display); text-align: left; }.progress-summary:focus-visible { outline: 2px solid #2e6fe0; outline-offset: 3px; }.progress-indicator { width: 8px; height: 8px; flex: 0 0 8px; border-radius: 50%; background: #4b7be0; }.progress-indicator.running, .progress-row.running .progress-dot { animation: progress-pulse 1.4s ease-in-out infinite; }.progress-indicator.degraded, .progress-row.degraded .progress-dot { background: #f08b3b; }.progress-indicator.completed { background: #4b7be0; }.progress-toggle { margin-left: auto; color: #8fa0b8; font-size: 11px; font-weight: 500; }.progress-details { display: grid; gap: 2px; padding: 1px 0 12px; }.progress-row { display: grid; grid-template-columns: 8px 72px minmax(0,1fr); align-items: start; gap: 8px; padding: 5px 0; color: #7890ac; font-size: 11px; line-height: 1.55; }.progress-row strong { color: #506887; font-size: 11px; }.progress-dot { width: 6px; height: 6px; margin-top: 5px; border-radius: 50%; background: #4b7be0; }@keyframes progress-pulse { 50% { opacity: .4; transform: scale(.72); } }.progress-details-enter-active, .progress-details-leave-active { transition: opacity .18s ease, transform .18s ease; }.progress-details-enter-from, .progress-details-leave-to { opacity: 0; transform: translateY(-4px); }.msg-enter-active { transition: opacity .22s ease, transform .22s ease; }.msg-enter-from { opacity: 0; transform: translateY(8px); }
 .answer-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }.risk-pill { padding: 4px 8px; border-radius: 999px; color: #436998; background: #edf4ff; font-size: 11px; font-weight: 700; }.risk-pill.medium { color: #9a641d; background: #fff2d9; }.risk-pill.high, .risk-pill.emergency { color: #a63a31; background: #fde7e4; }.profile-used { color: #7b91ac; font-size: 11px; }.citations { margin-top: 14px; padding-top: 12px; border-top: 1px solid #e2ebf7; }.citation-title { margin-bottom: 7px; color: #7188a5; font-size: 11px; font-weight: 700; letter-spacing: .08em; }.citation-card { display: flex; align-items: flex-start; gap: 9px; padding: 9px 10px; margin-top: 6px; border-radius: 9px; color: #3b5f91; background: #f4f8fe; text-decoration: none; transition: background .18s ease, transform .18s ease; }.citation-card:hover { background: #eaf2ff; transform: translateX(2px); }.citation-index { width: 20px; height: 20px; display: grid; place-items: center; flex-shrink: 0; border-radius: 6px; color: #fff; background: #2e6fe0; font-size: 10px; }.citation-card strong, .citation-card small { display: block; }.citation-card strong { font-size: 12px; }.citation-card small { margin-top: 2px; color: #8ba0ba; font-size: 10px; }
+.intake-card { margin-top: 14px; padding: 16px; border: 1px solid #b9d2f5; border-radius: 14px; background: linear-gradient(145deg, #f8fbff, #edf4ff); }.intake-card-title { margin-bottom: 7px; color: #245dbb; font-size: 12px; font-weight: 800; }.intake-card > strong { display: block; color: #294463; font-size: 14px; line-height: 1.55; }.intake-options { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 13px; }.intake-options button, .intake-free > button { min-height: 42px; padding: 9px 12px; border: 1px solid #9ebfea; border-radius: 9px; color: #2459a5; background: #fff; cursor: pointer; font-size: 13px; transition: background .18s ease, border-color .18s ease, transform .18s ease; }.intake-options button:hover:not(:disabled), .intake-free > button:hover:not(:disabled) { border-color: #5f92da; background: #eaf2ff; transform: translateY(-1px); }.intake-options button:focus-visible, .intake-free > button:focus-visible { outline: 2px solid #2e6fe0; outline-offset: 2px; }.intake-options button:disabled, .intake-free > button:disabled { opacity: .55; cursor: not-allowed; }.intake-free { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: end; gap: 8px; margin-top: 12px; }.intake-free :deep(.el-textarea__inner) { min-height: 64px !important; border-color: #afc9ed; color: #294463; box-shadow: none; }.intake-free :deep(.el-textarea__inner::placeholder) { color: #667b96; }.intake-selected { margin-top: 11px; color: #536b88; font-size: 13px; }.intake-card.answered .intake-options, .intake-card.answered .intake-free { display: none; }
 .hello { padding: 10vh 0 0; text-align: center; }.hello-orb { width: 72px; height: 72px; display: grid; place-items: center; margin: 0 auto 20px; border-radius: 16px; color: #fff; background: linear-gradient(135deg, #3e86ec, #2e6fe0); box-shadow: 0 14px 30px rgba(46,111,224,.24); }.hello h3 { color: #263b59; font-family: var(--hda-font-display); font-size: 22px; }.samples { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }.samples span { padding: 9px 14px; border: 1px solid #d4e3f8; border-radius: 9px; color: #4672b9; background: #fff; cursor: pointer; transition: .2s; }.samples span:hover { border-color: #82aceb; background: #f4f8fe; transform: translateY(-1px); }
 .composer-wrap { padding: 14px max(30px, calc((100% - 860px) / 2)) 16px; background: linear-gradient(180deg, rgba(255,255,255,.4), #fff 32%); }.input-row { display: flex; align-items: flex-end; gap: 8px; padding: 10px 10px 10px 15px; border: 1px solid #d8e5f7; border-radius: 12px; background: #fff; box-shadow: 0 10px 24px rgba(46,111,224,.1); transition: .2s; }.input-row:focus-within { border-color: #80abea; box-shadow: 0 12px 28px rgba(46,111,224,.16); }.input-row .el-textarea { flex: 1; }:deep(.el-textarea__inner) { padding: 6px 0; border: 0; box-shadow: none !important; background: transparent; line-height: 1.6; }.send-button { width: 38px; height: 38px; display: grid; place-items: center; flex-shrink: 0; border: 0; border-radius: 10px; color: #a8b7cb; background: #edf2f8; cursor: not-allowed; transition: .2s; }.send-button.ready { color: #fff; background: linear-gradient(135deg, #3e86ec, #2e6fe0); cursor: pointer; box-shadow: 0 6px 14px rgba(46,111,224,.26); }.send-button.ready:hover { transform: translateY(-1px); }.send-loading { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.35); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; }.composer-tip { padding-top: 7px; text-align: center; color: #9baabd; font-size: 10px; }@keyframes spin { to { transform: rotate(360deg); } }
 .face.working { background: #edf4ff; }.agent-loader { width: 15px; height: 15px; border: 2px solid #c7daf8; border-top-color: #2e6fe0; border-radius: 50%; animation: agent-spin .72s linear infinite; }@keyframes agent-spin { to { transform: rotate(360deg); } }
-@media (max-width: 768px) { .chat-shell { height: calc(100vh - 96px); min-height: 520px; margin: 0; border-radius: 12px; }.session-panel { width: 64px; padding: 14px 8px; }.assistant-brand { justify-content: center; padding: 2px 0 18px; }.assistant-brand > div:last-child, .new-session span, .new-session kbd, .history-label, .session-title, .session-time { display: none; }.new-session { justify-content: center; padding: 11px; }.session-item { height: 40px; }.messages, .composer-wrap { padding-left: 16px; padding-right: 16px; }.assistant-response, .bubble { max-width: 86%; }.profile-consent > div { display: none; }.profile-consent { padding: 7px 9px; }.progress-row { grid-template-columns: 8px 66px minmax(0,1fr); } }
+@media (max-width: 768px) { .chat-shell { height: calc(100vh - 96px); min-height: 520px; margin: 0; border-radius: 12px; }.session-panel { width: 64px; padding: 14px 8px; }.assistant-brand { justify-content: center; padding: 2px 0 18px; }.assistant-brand > div:last-child, .new-session span, .new-session kbd, .history-label, .session-title, .session-time { display: none; }.new-session { justify-content: center; padding: 11px; }.session-item { height: 40px; }.messages, .composer-wrap { padding-left: 16px; padding-right: 16px; }.assistant-response, .bubble { max-width: 86%; }.profile-consent > div { display: none; }.profile-consent { padding: 7px 9px; }.progress-row { grid-template-columns: 8px 66px minmax(0,1fr); }.intake-free { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { .progress-indicator.running, .progress-row.running .progress-dot, .bubble.is-streaming::after, .send-loading, .agent-loader { animation: none; }.progress-details-enter-active, .progress-details-leave-active, .msg-enter-active { transition-duration: .01ms; } }
 .risk-pill { display: inline-flex; align-items: center; gap: 7px; min-height: 32px; padding: 6px 11px; border: 1px solid #bdd4f7; border-radius: 8px; color: #245dbb; background: #edf4ff; font-size: 12px; font-weight: 700; box-shadow: 0 3px 8px rgba(46,111,224,.08); }.risk-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }.risk-prefix { padding-right: 7px; border-right: 1px solid currentColor; opacity: .72; font-size: 11px; }.risk-pill.medium { border-color: #f0ca8b; color: #9a641d; background: #fff6e7; }.risk-pill.high, .risk-pill.emergency { border-color: #efb6b0; color: #a63a31; background: #fff0ee; }.risk-pill.emergency { color: #9c2922; background: #fde5e2; }
 </style>

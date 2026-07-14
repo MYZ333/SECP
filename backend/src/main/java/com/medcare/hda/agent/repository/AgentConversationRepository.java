@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.medcare.hda.agent.api.AgentCitation;
 import com.medcare.hda.agent.api.AgentHistoryMessage;
+import com.medcare.hda.agent.api.AgentSessionSummary;
 import com.medcare.hda.agent.core.AgentConversation;
 import com.medcare.hda.common.PageResult;
 import com.medcare.hda.common.ResultCode;
@@ -26,6 +27,8 @@ import java.util.UUID;
 @Repository
 @RequiredArgsConstructor
 public class AgentConversationRepository {
+
+    private static final int MAX_SESSIONS_PER_USER = 40;
 
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
@@ -51,9 +54,58 @@ public class AgentConversationRepository {
         return new AgentConversation(sessionId, conversationId);
     }
 
+    public List<AgentSessionSummary> listSessions(Long userId) {
+        return jdbcTemplate.query("""
+                SELECT s.session_id,
+                       COALESCE(
+                           (SELECT t.question FROM agent_chat_turn t
+                            WHERE t.user_id = s.user_id AND t.session_id = s.session_id
+                            ORDER BY t.create_time ASC LIMIT 1),
+                           (SELECT m.content FROM SPRING_AI_CHAT_MEMORY m
+                            WHERE m.conversation_id = s.conversation_id AND m.type = 'USER'
+                            ORDER BY m.timestamp ASC LIMIT 1)
+                       ) AS title,
+                       s.update_time
+                FROM agent_chat_session s
+                WHERE s.user_id = ?
+                ORDER BY s.update_time DESC, s.id DESC
+                LIMIT ?
+                """,
+                (rs, rowNum) -> new AgentSessionSummary(
+                        rs.getString("session_id"),
+                        rs.getString("title"),
+                        toLocalDateTime(rs.getTimestamp("update_time"))),
+                userId, MAX_SESSIONS_PER_USER);
+    }
+
+    @Transactional
     public void touch(Long userId, String sessionId) {
         jdbcTemplate.update("UPDATE agent_chat_session SET update_time = NOW() WHERE user_id = ? AND session_id = ?",
                 userId, sessionId);
+        pruneOldestSessions(userId);
+    }
+
+    private void pruneOldestSessions(Long userId) {
+        List<SessionStorage> expired = jdbcTemplate.query("""
+                SELECT session_id, conversation_id
+                FROM agent_chat_session
+                WHERE user_id = ?
+                ORDER BY update_time DESC, id DESC
+                LIMIT 1000000 OFFSET ?
+                """,
+                (rs, rowNum) -> new SessionStorage(rs.getString("session_id"), rs.getString("conversation_id")),
+                userId, MAX_SESSIONS_PER_USER);
+
+        for (SessionStorage session : expired) {
+            jdbcTemplate.update("DELETE FROM agent_consult_state WHERE user_id = ? AND session_id = ?",
+                    userId, session.sessionId());
+            jdbcTemplate.update("DELETE FROM agent_chat_turn WHERE user_id = ? AND session_id = ?",
+                    userId, session.sessionId());
+            jdbcTemplate.update("DELETE FROM SPRING_AI_CHAT_MEMORY WHERE conversation_id = ?",
+                    session.conversationId());
+            jdbcTemplate.update("DELETE FROM agent_chat_session WHERE user_id = ? AND session_id = ?",
+                    userId, session.sessionId());
+        }
     }
 
     public PageResult<AgentHistoryMessage> pageHistory(Long userId, String sessionId, long pageNum, long pageSize) {
@@ -148,4 +200,6 @@ public class AgentConversationRepository {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "sessionId 必须是 UUID 格式");
         }
     }
+
+    private record SessionStorage(String sessionId, String conversationId) {}
 }

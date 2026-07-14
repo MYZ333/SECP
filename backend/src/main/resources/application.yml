@@ -31,8 +31,8 @@ spring:
   # Spring AI 骨架预留：由他人接入具体模型，这里给占位配置
   ai:
     dashscope:
-      # 未配置时应用仍可启动；聊天、向量化等 AI 功能需要设置 APIKEY。
-      api-key: ${APIKEY:}
+      # 非敏感占位值只用于允许应用启动；聊天、向量化等 AI 功能需要通过环境变量设置真实 APIKEY。
+      api-key: ${AAA}
       chat:
         options:
           model: ${AI_CHAT_MODEL:qwen3.7-plus}
@@ -48,10 +48,11 @@ spring:
           jdbc:
             initialize-schema: never
     vectorstore:
+      # Chroma 不可用且只需启动非 AI 功能时，可设置 AI_VECTOR_STORE_TYPE=none 与 RAG_ENABLED=false。
+      type: ${AI_VECTOR_STORE_TYPE:chroma}
       chroma:
         client:
-          # Match start-chroma.ps1: use IPv4 explicitly to avoid localhost IPv4/IPv6 mismatch.
-          # Spring AI expects a complete base URL here, including the scheme.
+          # 必须包含 http:// 或 https://；显式使用 IPv4 避免 Windows 上 localhost 的 IPv4/IPv6 不一致。
           host: ${CHROMA_HOST:http://127.0.0.1}
           port: ${CHROMA_PORT:8000}
         tenant-name: ${CHROMA_TENANT:default_tenant}
@@ -80,6 +81,7 @@ hda:
     # RAG：文档存储、语义切片和向量检索
     rag:
       enabled: ${RAG_ENABLED:true}
+      knowledge-collection: ${CHROMA_KNOWLEDGE_COLLECTION:${CHROMA_COLLECTION:medical_knowledge}}
       storage-dir: ${RAG_STORAGE_DIR:../data/rag/documents}
       seed-dir: ${RAG_SEED_DIR:../data/rag/input}
       chunking:
@@ -91,6 +93,16 @@ hda:
       vector-top-k: ${RAG_VECTOR_TOP_K:30}
       final-top-k: ${RAG_FINAL_TOP_K:5}
       min-score: ${RAG_MIN_SCORE:0.35}
+      query-rewrite:
+        enabled: ${RAG_QUERY_REWRITE_ENABLED:true}
+        max-keywords: ${RAG_QUERY_REWRITE_MAX_KEYWORDS:6}
+      hybrid:
+        enabled: ${RAG_HYBRID_ENABLED:true}
+        keyword-top-k: ${RAG_KEYWORD_TOP_K:20}
+        rerank-top-k: ${RAG_RERANK_TOP_K:12}
+        rrf-k: ${RAG_RRF_K:60}
+        vector-weight: ${RAG_VECTOR_WEIGHT:1.0}
+        keyword-weight: ${RAG_KEYWORD_WEIGHT:0.8}
     # 对向量检索候选结果进行二次排序；配置不完整时自动使用原始向量排序
     rerank:
       enabled: ${RERANK_ENABLED:true}
@@ -99,6 +111,15 @@ hda:
     # 多智能体任务编排
     orchestration:
       worker-timeout-seconds: ${AGENT_WORKER_TIMEOUT_SECONDS:20}
+    memory:
+      enabled: ${LONG_TERM_MEMORY_ENABLED:true}
+      collection-name: ${CHROMA_MEMORY_COLLECTION:long_term_memory}
+      recall-top-k: ${LONG_TERM_MEMORY_RECALL_TOP_K:12}
+      prompt-limit: ${LONG_TERM_MEMORY_PROMPT_LIMIT:6}
+      max-retries: ${LONG_TERM_MEMORY_MAX_RETRIES:3}
+    intake:
+      enabled: ${AGENT_INTAKE_ENABLED:true}
+      max-rounds: ${AGENT_INTAKE_MAX_ROUNDS:6}
   # 阿里云短信。四项配置齐全时发真实短信；任一为空则为 mock 模式（验证码打印到后端日志）
   sms:
     access-key-id: ${SMS_ACCESS_KEY_ID:}

@@ -2,9 +2,9 @@ package com.medcare.hda.agent.knowledge;
 
 import com.medcare.hda.common.PageResult;
 import com.medcare.hda.exception.BusinessException;
-import lombok.RequiredArgsConstructor;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DuplicateKeyException;
@@ -34,7 +34,6 @@ import java.util.Map;
 import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
 public class KnowledgeAdminService {
     private final JdbcTemplate jdbcTemplate;
     private final KnowledgeDocumentParser parser;
@@ -45,6 +44,14 @@ public class KnowledgeAdminService {
     private String storageDir;
     @Value("${hda.agent.rag.seed-dir:../data/rag/input}")
     private String seedDir;
+
+    public KnowledgeAdminService(JdbcTemplate jdbcTemplate, KnowledgeDocumentParser parser, KnowledgeChunker chunker,
+                                 @Qualifier("knowledgeVectorStore") ObjectProvider<VectorStore> vectorStoreProvider) {
+        this.jdbcTemplate = jdbcTemplate;
+        this.parser = parser;
+        this.chunker = chunker;
+        this.vectorStoreProvider = vectorStoreProvider;
+    }
 
     public PageResult<KnowledgeDocumentView> page(long pageNum, long pageSize, String keyword, String status) {
         return page(pageNum, pageSize, keyword, status, "HEALTH");
@@ -130,6 +137,11 @@ public class KnowledgeAdminService {
         int imported = 0;
         try (var files = Files.list(root)) {
             for (Path path : files.filter(Files::isRegularFile).toList()) {
+                String checksum = sha256(Files.readAllBytes(path));
+                Integer existing = jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM knowledge_document WHERE checksum=? AND deleted=0",
+                        Integer.class, checksum);
+                if (existing != null && existing > 0) continue;
                 String raw = Files.readString(path, StandardCharsets.UTF_8);
                 String title = firstHeading(raw, path.getFileName().toString());
                 String org = metadata(raw, "来源机构：", "中华人民共和国国家卫生健康委员会");
@@ -167,7 +179,7 @@ public class KnowledgeAdminService {
                             "agentType", doc.get("agent_type"),
                             "section", chunk.sectionTitle() == null ? "正文" : chunk.sectionTitle()))
                     .build()).toList();
-            vectorStore.add(documents);
+            addDocumentsBatched(vectorStore, documents);
             jdbcTemplate.update("UPDATE knowledge_chunk SET vector_id=CONCAT('knowledge-',id),status='PUBLISHED' WHERE document_id=? AND deleted=0", documentId);
             jdbcTemplate.update("UPDATE knowledge_document SET status='PUBLISHED',reviewer_id=? WHERE id=?", reviewerId, documentId);
         } catch (Exception e) {
@@ -177,38 +189,105 @@ public class KnowledgeAdminService {
         }
     }
 
-    public void reindex(Long documentId, Long reviewerId) {
-        Map<String, Object> doc = document(documentId);
-        String filePath = doc.get("file_path") == null ? "" : String.valueOf(doc.get("file_path"));
-        if (!StringUtils.hasText(filePath) || !Files.isRegularFile(Path.of(filePath))) {
-            throw new BusinessException("原始文档不存在，无法重新清洗和语义分块，请重新上传文档");
-        }
-        List<KnowledgeChunker.Chunk> rebuiltChunks;
-        try {
-            rebuiltChunks = chunker.chunk(parser.parse(Path.of(filePath)));
-        } catch (Exception error) {
-            throw error instanceof BusinessException businessException ? businessException
-                    : new BusinessException("文档重新分块失败：" + error.getMessage());
-        }
-        if (rebuiltChunks.isEmpty()) throw new BusinessException("重新分块后没有可用内容");
-
-        inactive(documentId);
-        jdbcTemplate.update("DELETE FROM knowledge_chunk WHERE document_id=?", documentId);
-        insertChunks(documentId, rebuiltChunks);
-        jdbcTemplate.update("UPDATE knowledge_document SET status='DRAFT',chunk_count=?,failure_reason=NULL WHERE id=?",
-                rebuiltChunks.size(), documentId);
-        publish(documentId, reviewerId);
+    @Transactional
+    public void inactive(Long documentId) {
+        document(documentId);
+        clearIndexKeys(documentId);
+        jdbcTemplate.update("UPDATE knowledge_document SET status='INACTIVE' WHERE id=? AND deleted=0", documentId);
     }
 
     @Transactional
-    public void inactive(Long documentId) {
-        List<String> vectorIds = jdbcTemplate.query("SELECT vector_id FROM knowledge_chunk WHERE document_id=? AND vector_id IS NOT NULL AND deleted=0",
+    public void delete(Long documentId) {
+        Map<String, Object> doc = document(documentId);
+        String status = String.valueOf(doc.get("status"));
+        if (!"INACTIVE".equals(status)) {
+            throw new BusinessException("只有已停用的文档才能删除，当前状态为" + status);
+        }
+        jdbcTemplate.update("DELETE FROM knowledge_chunk WHERE document_id=?", documentId);
+        jdbcTemplate.update("DELETE FROM knowledge_document WHERE id=?", documentId);
+        deleteUploadedFile(doc.get("file_path"));
+    }
+
+    private void clearIndexKeys(Long documentId) {
+        List<String> vectorIds = jdbcTemplate.query("""
+                        SELECT COALESCE(NULLIF(vector_id,''),CONCAT('knowledge-',id))
+                        FROM knowledge_chunk WHERE document_id=? AND deleted=0
+                        """,
                 (rs, rowNum) -> rs.getString(1), documentId);
         VectorStore vectorStore = vectorStoreProvider.getIfAvailable();
-        if (vectorStore != null && !vectorIds.isEmpty()) vectorStore.delete(vectorIds);
-        jdbcTemplate.update("UPDATE knowledge_chunk SET status='INACTIVE' WHERE document_id=? AND deleted=0", documentId);
-        jdbcTemplate.update("UPDATE knowledge_document SET status='INACTIVE' WHERE id=? AND deleted=0", documentId);
+        if (!vectorIds.isEmpty()) {
+            if (vectorStore == null) throw new BusinessException("Chroma 向量库未连接，无法确认索引已删除");
+            vectorStore.delete(vectorIds);
+        }
+        jdbcTemplate.update("UPDATE knowledge_chunk SET vector_id=NULL,status='INACTIVE' WHERE document_id=? AND deleted=0", documentId);
     }
+
+    public BatchResult publishBatch(List<Long> documentIds, Long reviewerId) {
+        return executeBatch(documentIds, id -> {
+            requireDocumentStatus(id, "DRAFT", "FAILED", "INACTIVE");
+            publish(id, reviewerId);
+        });
+    }
+
+    public BatchResult inactiveBatch(List<Long> documentIds) {
+        return executeBatch(documentIds, id -> {
+            requireDocumentStatus(id, "PUBLISHED", "INACTIVE");
+            inactive(id);
+        });
+    }
+
+    private BatchResult executeBatch(List<Long> documentIds, BatchAction action) {
+        List<Long> ids = normalizeBatchIds(documentIds);
+        List<BatchFailure> failures = new ArrayList<>();
+        int succeeded = 0;
+        for (Long id : ids) {
+            try {
+                action.execute(id);
+                succeeded++;
+            } catch (Exception error) {
+                failures.add(new BatchFailure(id, abbreviate(error.getMessage(), 200)));
+            }
+        }
+        return new BatchResult(ids.size(), succeeded, failures.size(), failures);
+    }
+
+    private List<Long> normalizeBatchIds(List<Long> documentIds) {
+        if (documentIds == null) throw new BusinessException("请选择要操作的资料");
+        List<Long> ids = documentIds.stream().filter(id -> id != null && id > 0).distinct().toList();
+        if (ids.isEmpty()) throw new BusinessException("请选择要操作的资料");
+        if (ids.size() > 100) throw new BusinessException("单次最多批量操作100份资料");
+        return ids;
+    }
+
+    private Map<String, Object> requireDocumentStatus(Long documentId, String... allowedStatuses) {
+        Map<String, Object> doc = document(documentId);
+        String status = String.valueOf(doc.get("status"));
+        if (!List.of(allowedStatuses).contains(status)) {
+            throw new BusinessException("资料当前状态为" + status + "，不支持此操作");
+        }
+        return doc;
+    }
+
+    private void deleteUploadedFile(Object filePathValue) {
+        if (filePathValue == null || !StringUtils.hasText(storageDir)) return;
+        try {
+            Path storageRoot = Path.of(storageDir).toAbsolutePath().normalize();
+            Path filePath = Path.of(String.valueOf(filePathValue)).toAbsolutePath().normalize();
+            // 首批语料指向只读种子目录；这里只删除上传目录内的原文件。
+            if (filePath.startsWith(storageRoot)) Files.deleteIfExists(filePath);
+        } catch (IOException error) {
+            throw new BusinessException("文档原文件删除失败：" + error.getMessage());
+        }
+    }
+
+    @FunctionalInterface
+    private interface BatchAction {
+        void execute(Long documentId);
+    }
+
+    public record BatchFailure(Long documentId, String reason) {}
+
+    public record BatchResult(int total, int succeeded, int failed, List<BatchFailure> failures) {}
 
     private Long createDocument(Path path, String fileName, String title, String sourceOrg, String sourceUrl,
                                 LocalDate publishedDate, String versionNo, String category, String agentType) throws IOException {
@@ -239,6 +318,13 @@ public class KnowledgeAdminService {
                     INSERT INTO knowledge_chunk(document_id,chunk_no,section_title,content,checksum,status)
                     VALUES(?,?,?,?,?,'DRAFT')
                     """, documentId, chunk.number(), chunk.section(), chunk.content(), sha256(chunk.content().getBytes(StandardCharsets.UTF_8)));
+        }
+    }
+
+    /** text-embedding-v4 accepts at most 10 texts per request. */
+    private void addDocumentsBatched(VectorStore vectorStore, List<Document> documents) {
+        for (int start = 0; start < documents.size(); start += 10) {
+            vectorStore.add(documents.subList(start, Math.min(documents.size(), start + 10)));
         }
     }
 

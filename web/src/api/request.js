@@ -106,7 +106,11 @@ request.interceptors.response.use(
   async error => {
     const { response, config } = error
     if (!response) {
-      ElMessage.error(error.message || '网络错误')
+      if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
+        ElMessage.error('请求处理时间较长，请稍后刷新页面查看结果')
+      } else {
+        ElMessage.error(error.message || '网络错误')
+      }
       return Promise.reject(error)
     }
     const status = response.status
