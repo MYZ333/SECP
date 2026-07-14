@@ -1,12 +1,13 @@
 # 智慧医养大数据公共服务平台 · 个人健康档案系统
 
-前后端分离项目。五个独立目录：
+前后端分离项目。主要目录如下：
 
 - `backend/` —— Java 后端（Spring Boot）
 - `web/` —— Web 端（Vue3 + Element Plus，含管理端）
 - `miniprogram/` —— 小程序端（uni-app，面向老人，登录后直达 AI 健康咨询）
 - `doctor-web/` —— 医生 Web 端（Vue3 + Element Plus）
 - `doctor-miniprogram/` —— 医生小程序端（uni-app）
+- `apk-output/` —— 患者端和医生端 Android 测试 APK 输出目录
 
 ## 技术栈
 
@@ -17,6 +18,7 @@
 | 小程序 | uni-app (Vue3)，可编译到微信小程序 / H5 |
 | 医生 Web | Vue3 + Vite + Element Plus + Pinia + Vue Router + Axios |
 | 医生小程序 | uni-app (Vue3)，可编译到微信小程序 / H5 |
+| Android 测试端 | Capacitor 8 + Android SDK 36，将 `web/` 与 `doctor-web/` 分别封装为 APK |
 
 后端包名：`com.medcare.hda`。演示账号密码统一为 `123456`：管理员 `admin`、普通用户 `user001`、医生 `doctor1` 至 `doctor20`。
 
@@ -244,6 +246,39 @@ npm run build:mp-weixin
 | 小程序端(H5) | http://localhost:5175 |
 | 医生 Web 端 | http://localhost:5176 |
 | 医生小程序端(H5) | http://localhost:5177 |
+
+## Android 测试 APK
+
+项目使用 Capacitor 将现有 Vue Web 页面封装为两个独立 Android 应用。Android 构建只读取 `.env.android`，不会改变 `npm run dev` 使用的本地 Vite 代理。
+
+| 应用 | Android 包名 | Android 环境配置 | 当前测试服务器 |
+|------|-------------|------------------|----------------|
+| 患者端 | `com.secp.hda.patient` | `web/.env.android` | `http://8.137.115.167` |
+| 医生端 | `com.secp.hda.doctor` | `doctor-web/.env.android` | `http://8.137.115.167:8081` |
+
+快速重新构建患者端：
+
+```powershell
+Set-Location D:\SECP\SECP\web
+npm run android:sync
+Set-Location android
+$env:GRADLE_USER_HOME = "D:\GradleCache"
+.\gradlew.bat assembleDebug
+```
+
+快速重新构建医生端：
+
+```powershell
+Set-Location D:\SECP\SECP\doctor-web
+npm run android:sync
+Set-Location android
+$env:GRADLE_USER_HOME = "D:\GradleCache"
+.\gradlew.bat assembleDebug
+```
+
+原始 APK 分别生成在 `web/android/app/build/outputs/apk/debug/app-debug.apk` 和 `doctor-web/android/app/build/outputs/apk/debug/app-debug.apk`。环境安装、服务器切换、真机安装、正式签名和故障排查请阅读 [APK 打包教程](APK_BUILD.md)。
+
+> 当前测试服务器使用 HTTP，因此 Capacitor 配置已允许明文流量，仅适用于课程项目和内部测试。正式发布时应改为 HTTPS。服务器还需要正确代理 `/ws/doctor-consult`，否则普通 API 可用但实时咨询无法建立 WebSocket 连接。
 
 ---
 

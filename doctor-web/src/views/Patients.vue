@@ -22,7 +22,7 @@
         <el-table-column label="患者" min-width="220">
           <template #default="{ row }">
             <div class="patient-cell">
-              <el-avatar :size="42" :src="row.avatar">{{ initial(row) }}</el-avatar>
+              <el-avatar :size="42" :src="resolveServerUrl(row.avatar)">{{ initial(row) }}</el-avatar>
               <div><b>{{ row.nickname || row.username }}</b><span>{{ row.username }}</span></div>
             </div>
           </template>
@@ -59,6 +59,7 @@ import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowRight, Refresh, Search } from '@element-plus/icons-vue'
 import { pagePatients } from '@/api'
+import { resolveServerUrl } from '@/config/server'
 
 const router = useRouter()
 const list = ref([])

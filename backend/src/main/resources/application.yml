@@ -15,7 +15,7 @@ spring:
     url: jdbc:mysql://localhost:3306/hda_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
     # 生产环境用环境变量覆盖，勿把真实密码提交进仓库
     username: ${DB_USERNAME:root}
-    password: ${DB_PASSWORD:123456}
+    password: ${DB_PASSWORD:zb2733286389}
   data:
     redis:
       host: localhost
@@ -31,8 +31,9 @@ spring:
   # Spring AI 骨架预留：由他人接入具体模型，这里给占位配置
   ai:
     dashscope:
-      # 非敏感占位值只用于允许应用启动；聊天、向量化等 AI 功能需要通过环境变量设置真实 APIKEY。
-      api-key: ${AAA}
+
+      api-key: ${APIKEY:}
+
       chat:
         options:
           model: ${AI_CHAT_MODEL:qwen3.7-plus}

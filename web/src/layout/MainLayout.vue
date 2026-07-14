@@ -15,11 +15,12 @@
 
         <nav class="nav-items">
           <template v-for="item in navList" :key="item.key">
-            <div v-if="item.children" class="nav-link"
+            <router-link v-if="item.children" :to="item.path" class="nav-link"
                  :class="{ active: isActive(item), open: openKey === item.key }"
-                 @mouseenter="openKey = item.key">
+                 @mouseenter="openKey = item.key"
+                 @click="openKey = null">
               {{ item.title }}
-            </div>
+            </router-link>
             <router-link v-else :to="item.path" class="nav-link"
                          :class="{ active: isActive(item) }"
                          @mouseenter="openKey = null">
@@ -91,6 +92,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import { getPointBalance, pageMetric, pageAlerts, logoutApi } from '@/api'
 import ApplicationAssistant from '@/components/ApplicationAssistant.vue'
+import { resolveServerUrl } from '@/config/server'
 
 const router = useRouter()
 const route = useRoute()
@@ -98,7 +100,7 @@ const userStore = useUserStore()
 const openKey = ref(null)
 const userDisplayName = computed(() => userStore.userInfo.nickname || userStore.userInfo.username || '用户')
 const userInitial = computed(() => userDisplayName.value.charAt(0))
-const userAvatar = computed(() => userStore.userInfo.avatar || '')
+const userAvatar = computed(() => resolveServerUrl(userStore.userInfo.avatar))
 
 /* —— 导航滚动收缩 —— */
 const scrolled = ref(false)
@@ -134,7 +136,7 @@ const navList = computed(() => {
   const list = [
     { key: 'dashboard', title: '首页', path: '/dashboard' },
     {
-      key: 'health', title: '健康档案', base: '/health',
+      key: 'health', title: '健康档案', path: '/health', base: '/health',
       children: [
         { title: '基本信息', path: '/health/profile', desc: '个人资料与健康标签' },
         { title: '体征数据', path: '/health/metric', desc: '血压、血糖等日常记录' },
@@ -143,7 +145,7 @@ const navList = computed(() => {
       ],
     },
     {
-      key: 'point', title: '积分中心', base: '/point',
+      key: 'point', title: '积分中心', path: '/point', base: '/point',
       children: [
         { title: '积分商城', path: '/point/mall', desc: '积分好礼免费兑换' },
         { title: '积分明细', path: '/point/record', desc: '积分获取与消耗记录' },
@@ -157,7 +159,7 @@ const navList = computed(() => {
   ]
   if (userStore.isAdmin) {
     list.push({
-      key: 'admin', title: '系统管理', base: '/admin',
+      key: 'admin', title: '系统管理', path: '/admin', base: '/admin',
       children: [
         { title: '用户管理', path: '/admin/user', desc: '平台用户与权限管理' },
         { title: '商品管理', path: '/admin/product', desc: '积分商城商品维护' },

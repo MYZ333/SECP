@@ -17,7 +17,7 @@
       <template v-if="active">
         <header class="chat-head">
           <div class="doc">
-            <el-avatar :size="46" :src="active.doctor?.avatar">{{ active.doctor?.name?.charAt(0) || '医' }}</el-avatar>
+            <el-avatar :size="46" :src="resolveServerUrl(active.doctor?.avatar)">{{ active.doctor?.name?.charAt(0) || '医' }}</el-avatar>
             <div>
               <div class="doc-name">{{ active.doctor?.name }}</div>
               <div class="doc-sub">{{ active.doctor?.hospital }} · {{ active.doctor?.department }} · {{ isClosed(active) ? '会话已结束' : '实时咨询' }}</div>
@@ -33,7 +33,7 @@
             <div v-if="m.senderType === 'DOCTOR'" class="face"><el-icon><Avatar /></el-icon></div>
             <div class="bubble">
               <template v-if="m.messageType === 'ATTACHMENT'">
-                <a :href="m.attachmentUrl" target="_blank">{{ m.attachmentName || '查看附件' }}</a>
+                <a :href="resolveServerUrl(m.attachmentUrl)" target="_blank">{{ m.attachmentName || '查看附件' }}</a>
                 <p v-if="m.content">{{ m.content }}</p>
               </template>
               <template v-else>{{ m.content }}</template>
@@ -73,6 +73,7 @@ import {
   startDoctorSession,
   uploadConsultAttachment
 } from '@/api'
+import { resolveServerUrl } from '@/config/server'
 
 const route = useRoute()
 const sessions = ref([])

@@ -22,6 +22,7 @@ $stderrPath = Join-Path $resolvedDataPath "chroma.stderr.log"
 $heartbeatUrl = "http://${BindAddress}:$Port/api/v2/heartbeat"
 New-Item -ItemType Directory -Path $resolvedDataPath -Force | Out-Null
 
+
 function Test-ChromaReady {
     try {
         $response = Invoke-RestMethod -Uri $heartbeatUrl -Method Get -TimeoutSec 2
@@ -50,6 +51,7 @@ if ($ChromaExecutable) {
     $ChromaExecutable = [System.IO.Path]::GetFullPath($ChromaExecutable)
     if (-not (Test-Path -LiteralPath $ChromaExecutable -PathType Leaf)) {
         throw "The specified Chroma executable does not exist: $ChromaExecutable"
+
     }
 } else {
     $ChromaExecutable = Find-ChromaExecutable
