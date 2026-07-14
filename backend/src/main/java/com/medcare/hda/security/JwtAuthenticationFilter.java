@@ -2,6 +2,7 @@ package com.medcare.hda.security;
 
 import com.medcare.hda.common.ResultCode;
 import com.medcare.hda.entity.User;
+import com.medcare.hda.mapper.RoleMapper;
 import com.medcare.hda.mapper.UserMapper;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
@@ -30,6 +31,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtUtil jwtUtil;
     private final JwtProperties jwtProperties;
     private final UserMapper userMapper;
+    private final RoleMapper roleMapper;
     private final RedisTemplate<String, Object> redisTemplate;
 
     private static final String TOKEN_KEY_PREFIX = "hda:login:token:";
@@ -61,7 +63,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 }
                 User user = userMapper.selectById(userId);
                 if (user != null && (user.getStatus() == null || user.getStatus() == 0)) {
-                    LoginUser loginUser = new LoginUser(user);
+                    LoginUser loginUser = new LoginUser(user, roleMapper.selectRoleCodesByUserId(userId));
                     UsernamePasswordAuthenticationToken authentication =
                             new UsernamePasswordAuthenticationToken(
                                     loginUser, null, loginUser.getAuthorities());

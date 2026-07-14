@@ -35,7 +35,10 @@ public class AdminUserController {
                                 .or()
                                 .like(User::getNickname, keyword))
                         .orderByDesc(User::getCreateTime));
-        page.getRecords().forEach(u -> u.setPassword(null));
+        page.getRecords().forEach(u -> {
+            userService.populateUserSnapshot(u);
+            u.setPassword(null);
+        });
         return Result.success(PageResult.of(page));
     }
 

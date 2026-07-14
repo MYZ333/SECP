@@ -6,7 +6,7 @@ const qs = (p = {}) => {
   return s ? '?' + s : ''
 }
 
-export const login = (data) => request({ url: '/auth/login', method: 'POST', data })
+export const login = (data) => request({ url: '/doctor-auth/login', method: 'POST', data })
 export const registerDoctor = (data) => request({ url: '/doctor-auth/register', method: 'POST', data })
 export const getMe = () => request({ url: '/doctor-portal/me' })
 export const updateMe = (data) => request({ url: '/doctor-portal/me', method: 'PUT', data })

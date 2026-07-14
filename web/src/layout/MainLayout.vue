@@ -3,7 +3,7 @@
     <!-- 顶部导航栏（阿里云风格：悬停向下展开；滚动 >80px 收缩为毛玻璃悬浮条） -->
     <header class="topnav" :class="{ scrolled }" @mouseleave="openKey = null">
       <div class="nav-inner">
-        <div class="logo" @click="$router.push('/dashboard')">
+        <div class="logo" @click="router.push(homePath)">
           <svg class="logo-icon" viewBox="0 0 52 34" aria-hidden="true">
             <path d="M15.5 1.5 C7 1.5 1.5 7 1.5 15.5 v3 C1.5 27 7 32.5 15.5 32.5 h6.2 l-4.6-5.6 h-1.6 c-4.6 0-7-2.4-7-7 v-5.8 c0-4.6 2.4-7 7-7 h1.6 L21.7 1.5 Z" />
             <path d="M36.5 1.5 C45 1.5 50.5 7 50.5 15.5 v3 c0 8.5-5.5 14-14 14 h-6.2 l4.6-5.6 h1.6 c4.6 0 7-2.4 7-7 v-5.8 c0-4.6-2.4-7-7-7 h-1.6 L30.3 1.5 Z" />
@@ -47,7 +47,7 @@
 
           <!-- 头像 hover：今日健康摘要（毛玻璃小卡片） -->
           <transition name="sumpop">
-            <div v-if="sumVisible" class="ava-pop" @click.stop>
+            <div v-if="userStore.isPatient && sumVisible" class="ava-pop" @click.stop>
               <p class="ap-title">今日健康摘要</p>
               <p class="ap-date">{{ sumDate }}</p>
               <template v-if="sumLoaded">
@@ -101,6 +101,7 @@ const openKey = ref(null)
 const userDisplayName = computed(() => userStore.userInfo.nickname || userStore.userInfo.username || '用户')
 const userInitial = computed(() => userDisplayName.value.charAt(0))
 const userAvatar = computed(() => resolveServerUrl(userStore.userInfo.avatar))
+const homePath = computed(() => userStore.isAdmin && !userStore.isPatient ? '/admin' : '/dashboard')
 
 /* —— 导航滚动收缩 —— */
 const scrolled = ref(false)
@@ -114,6 +115,7 @@ const sumLoaded = ref(false)
 const summary = ref({ balance: 0, todayMetric: 0, alert: 0 })
 const sumDate = new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' })
 async function showSummary() {
+  if (!userStore.isPatient) return
   sumVisible.value = true
   if (sumLoaded.value) return
   try {
@@ -133,6 +135,16 @@ async function showSummary() {
 }
 
 const navList = computed(() => {
+  if (userStore.isAdmin && !userStore.isPatient) {
+    return [
+      { key: 'adminHome', title: '系统管理', path: '/admin' },
+      { key: 'adminUser', title: '用户管理', path: '/admin/user' },
+      { key: 'adminProduct', title: '商品管理', path: '/admin/product' },
+      { key: 'adminDoctor', title: '专家管理', path: '/admin/doctor' },
+      { key: 'adminKnowledge', title: '智能体知识库', path: '/admin/knowledge' },
+      { key: 'account', title: '账户管理', path: '/account' },
+    ]
+  }
   const list = [
     { key: 'dashboard', title: '首页', path: '/dashboard' },
     {

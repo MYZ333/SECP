@@ -9,16 +9,17 @@ import com.medcare.hda.dto.CheckInVO;
 import com.medcare.hda.dto.ClaimVO;
 import com.medcare.hda.dto.ExchangeDTO;
 import com.medcare.hda.dto.PointTaskVO;
+import com.medcare.hda.entity.PointAccount;
 import com.medcare.hda.entity.PointExchange;
 import com.medcare.hda.entity.PointProduct;
 import com.medcare.hda.entity.PointRecord;
-import com.medcare.hda.entity.User;
 import com.medcare.hda.exception.BusinessException;
+import com.medcare.hda.mapper.PointAccountMapper;
 import com.medcare.hda.mapper.PointExchangeMapper;
 import com.medcare.hda.mapper.PointProductMapper;
 import com.medcare.hda.mapper.PointRecordMapper;
-import com.medcare.hda.mapper.UserMapper;
 import com.medcare.hda.service.PointService;
+import com.medcare.hda.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -40,7 +41,8 @@ public class PointServiceImpl implements PointService {
     /** 连签加成上限(连续7天及以上每天可得 2+6=8 分) */
     private static final int CHECKIN_MAX_BONUS = 6;
 
-    private final UserMapper userMapper;
+    private final UserService userService;
+    private final PointAccountMapper pointAccountMapper;
     private final PointRecordMapper pointRecordMapper;
     private final PointProductMapper pointProductMapper;
     private final PointExchangeMapper pointExchangeMapper;
@@ -52,17 +54,28 @@ public class PointServiceImpl implements PointService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public PointRecord addPoints(Long userId, Integer change, String type, String description) {
-        User user = userMapper.selectById(userId);
-        if (user == null) {
+        if (!userService.hasRole(userId, "PATIENT")) {
+            throw new BusinessException(ResultCode.FORBIDDEN);
+        }
+        PointAccount account = pointAccountMapper.selectOne(Wrappers.<PointAccount>lambdaQuery()
+                .eq(PointAccount::getUserId, userId)
+                .last("LIMIT 1"));
+        if (account == null) {
+            userService.ensurePatientResources(userId);
+            account = pointAccountMapper.selectOne(Wrappers.<PointAccount>lambdaQuery()
+                    .eq(PointAccount::getUserId, userId)
+                    .last("LIMIT 1"));
+        }
+        if (account == null) {
             throw new BusinessException(ResultCode.NOT_FOUND);
         }
-        int current = user.getPoints() == null ? 0 : user.getPoints();
+        int current = account.getBalance() == null ? 0 : account.getBalance();
         int balance = current + change;
         if (balance < 0) {
             throw new BusinessException(ResultCode.POINTS_NOT_ENOUGH);
         }
-        user.setPoints(balance);
-        userMapper.updateById(user);
+        account.setBalance(balance);
+        pointAccountMapper.updateById(account);
 
         PointRecord record = new PointRecord();
         record.setUserId(userId);
@@ -119,6 +132,9 @@ public class PointServiceImpl implements PointService {
 
     @Override
     public List<PointTaskVO> listTasks(Long userId) {
+        if (!userService.hasRole(userId, "PATIENT")) {
+            throw new BusinessException(ResultCode.FORBIDDEN);
+        }
         LocalDate today = LocalDate.now();
         boolean checkedIn = hasRecordOn(userId, "CHECKIN", today);
         int streak = calcStreak(userId);
@@ -219,6 +235,9 @@ public class PointServiceImpl implements PointService {
     @Override
     public void markTaskReady(Long userId, String type) {
         try {
+            if (!userService.hasRole(userId, "PATIENT")) {
+                return;
+            }
             if (!isClaimableTask(type)) {
                 return;
             }
