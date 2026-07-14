@@ -3,7 +3,7 @@ import { encryptPassword } from './crypto'
 import { createWebSocketUrl } from '@/config/server'
 
 export const login = async (data) =>
-  request.post('/auth/login', { ...data, password: await encryptPassword(data.password) })
+  request.post('/doctor-auth/login', { ...data, password: await encryptPassword(data.password) })
 
 export const registerDoctor = async (data) =>
   request.post('/doctor-auth/register', { ...data, password: await encryptPassword(data.password) })

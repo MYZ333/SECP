@@ -21,6 +21,10 @@ public class SecurityUtil {
     }
 
     public static boolean isAdmin() {
-        return "ADMIN".equals(getLoginUser().getRole());
+        return getLoginUser().hasRole("ADMIN");
+    }
+
+    public static boolean hasRole(String role) {
+        return getLoginUser().hasRole(role);
     }
 }

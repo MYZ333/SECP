@@ -8,7 +8,9 @@ export const useUserStore = defineStore('user', {
   }),
   getters: {
     isLogin: (state) => !!state.token,
-    isAdmin: (state) => state.userInfo.role === 'ADMIN'
+    roles: (state) => state.userInfo.roles || (state.userInfo.role ? [state.userInfo.role] : []),
+    isAdmin: (state) => (state.userInfo.roles || [state.userInfo.role]).includes('ADMIN'),
+    isPatient: (state) => (state.userInfo.roles || [state.userInfo.role]).includes('PATIENT')
   },
   actions: {
     setLogin(data) {

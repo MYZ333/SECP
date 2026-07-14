@@ -212,7 +212,7 @@ async function doLogin() {
     const res = await login(loginForm.value)
     userStore.setLogin(res.data)
     await gsap.to(wipe.value, { scale: 90, duration: .8, ease: 'power3.in' })
-    router.push('/dashboard')
+    router.push(homePath(res.data))
   } finally { loading.value = false }
 }
 
@@ -239,7 +239,7 @@ async function doPhoneLogin() {
     const res = await phoneLogin({ phone: phoneForm.value.phone, code: phoneForm.value.code })
     userStore.setLogin(res.data)
     await gsap.to(wipe.value, { scale: 90, duration: .8, ease: 'power3.in' })
-    router.push('/dashboard')
+    router.push(homePath(res.data))
   } finally { loading.value = false }
 }
 
@@ -272,6 +272,10 @@ async function doRegister() {
 }
 
 /* ============ 开场动画（GSAP 时间线） ============ */
+function homePath(userInfo) {
+  return userInfo?.role === 'ADMIN' ? '/admin' : '/dashboard'
+}
+
 let ctx
 onMounted(() => {
   ctx = gsap.context(() => {

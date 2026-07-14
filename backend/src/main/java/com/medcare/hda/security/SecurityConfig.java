@@ -41,6 +41,7 @@ public class SecurityConfig {
             "/api/auth/public-key",
             "/api/auth/refresh",
             "/api/auth/logout",
+            "/api/doctor-auth/login",
             "/api/doctor-auth/register",
             "/ws/doctor-consult",
             "/uploads/**",
@@ -64,6 +65,9 @@ public class SecurityConfig {
                         .requestMatchers(WHITE_LIST).permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/doctor-portal/**").hasRole("DOCTOR")
+                        .requestMatchers("/api/point/**", "/api/consult/**", "/api/health/**", "/api/doctor-consult/**", "/api/alert/**")
+                        .hasRole("PATIENT")
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(jsonAuthEntryPoint)

@@ -11,6 +11,7 @@ import com.medcare.hda.dto.DoctorStatsVO;
 import com.medcare.hda.dto.PatientDetailVO;
 import com.medcare.hda.entity.*;
 import com.medcare.hda.exception.BusinessException;
+import com.medcare.hda.mapper.UserMapper;
 import com.medcare.hda.security.SecurityUtil;
 import com.medcare.hda.service.*;
 import com.medcare.hda.websocket.DoctorConsultNotifier;
@@ -41,6 +42,7 @@ public class DoctorPortalController {
     private final HealthReportService reportService;
     private final HealthAlertService alertService;
     private final DoctorConsultNotifier notifier;
+    private final UserMapper userMapper;
 
     @Operation(summary = "当前医生资料")
     @GetMapping("/me")
@@ -70,9 +72,7 @@ public class DoctorPortalController {
         Doctor doctor = currentDoctor();
         List<DoctorConsultSession> sessions = sessionService.list(Wrappers.<DoctorConsultSession>lambdaQuery()
                 .eq(DoctorConsultSession::getDoctorId, doctor.getId()));
-        long patientCount = userService.count(Wrappers.<User>lambdaQuery()
-                .eq(User::getRole, "USER")
-                .eq(User::getStatus, 0));
+        long patientCount = userMapper.countActivePatients();
         long unread = sessions.stream().mapToLong(s -> s.getUnreadDoctor() == null ? 0 : s.getUnreadDoctor()).sum();
         long todayMessages = messageService.count(Wrappers.<DoctorConsultMessage>lambdaQuery()
                 .eq(DoctorConsultMessage::getDoctorId, doctor.getId())
@@ -91,15 +91,11 @@ public class DoctorPortalController {
                                              @RequestParam(defaultValue = "10") long pageSize,
                                              @RequestParam(required = false) String keyword) {
         currentDoctor();
-        var page = userService.page(new Page<>(pageNum, pageSize),
-                Wrappers.<User>lambdaQuery()
-                        .eq(User::getRole, "USER")
-                        .eq(User::getStatus, 0)
-                        .and(keyword != null && !keyword.isBlank(), w -> w
-                                .like(User::getNickname, keyword)
-                                .or().like(User::getUsername, keyword))
-                        .orderByDesc(User::getCreateTime));
-        page.getRecords().forEach(u -> u.setPassword(null));
+        var page = userMapper.pageActivePatients(new Page<>(pageNum, pageSize), keyword);
+        page.getRecords().forEach(u -> {
+            userService.populateUserSnapshot(u);
+            u.setPassword(null);
+        });
         return Result.success(PageResult.of(page));
     }
 
@@ -108,7 +104,7 @@ public class DoctorPortalController {
     public Result<PatientDetailVO> patientDetail(@PathVariable Long userId) {
         currentDoctor();
         User patient = userService.getById(userId);
-        if (patient == null || !"USER".equals(patient.getRole()) || patient.getStatus() == null || patient.getStatus() != 0) {
+        if (patient == null || !userService.hasRole(userId, "PATIENT") || patient.getStatus() == null || patient.getStatus() != 0) {
             throw new BusinessException(ResultCode.NOT_FOUND.getCode(), "患者不存在");
         }
         patient.setPassword(null);
@@ -190,7 +186,7 @@ public class DoctorPortalController {
     }
 
     private Doctor currentDoctor() {
-        if (!"DOCTOR".equals(SecurityUtil.getLoginUser().getRole())) {
+        if (!SecurityUtil.hasRole("DOCTOR")) {
             throw new BusinessException(ResultCode.FORBIDDEN);
         }
         Doctor doctor = doctorService.getOne(Wrappers.<Doctor>lambdaQuery()

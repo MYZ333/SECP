@@ -20,10 +20,6 @@ CREATE TABLE sys_user (
     nickname     VARCHAR(50)           DEFAULT NULL COMMENT '昵称',
     avatar       VARCHAR(255)          DEFAULT NULL COMMENT '头像URL',
     phone        VARCHAR(20)           DEFAULT NULL COMMENT '手机号',
-    gender       TINYINT               DEFAULT 0 COMMENT '性别:0未知1男2女',
-    birthday     DATE                  DEFAULT NULL COMMENT '生日',
-    role         VARCHAR(20)  NOT NULL DEFAULT 'USER' COMMENT '角色:USER/ADMIN',
-    points       INT          NOT NULL DEFAULT 0 COMMENT '积分余额',
     status       TINYINT      NOT NULL DEFAULT 0 COMMENT '状态:0正常1禁用',
     create_time  DATETIME              DEFAULT NULL COMMENT '创建时间',
     update_time  DATETIME              DEFAULT NULL COMMENT '更新时间',
@@ -35,6 +31,69 @@ CREATE TABLE sys_user (
     -- 若报重复键错误，先查重：SELECT phone, COUNT(*) FROM sys_user WHERE phone IS NOT NULL GROUP BY phone HAVING COUNT(*)>1;
     UNIQUE KEY uk_phone (phone)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户表';
+
+-- ---------------------------
+-- RBAC-角色
+-- ---------------------------
+DROP TABLE IF EXISTS sys_role;
+CREATE TABLE sys_role (
+    id          BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+    code        VARCHAR(30) NOT NULL COMMENT '角色编码:ADMIN/PATIENT/DOCTOR',
+    name        VARCHAR(50) NOT NULL COMMENT '角色名称',
+    status      TINYINT     NOT NULL DEFAULT 1 COMMENT '状态:0停用1启用',
+    create_time DATETIME             DEFAULT NULL COMMENT '创建时间',
+    update_time DATETIME             DEFAULT NULL COMMENT '更新时间',
+    deleted     TINYINT     NOT NULL DEFAULT 0 COMMENT '逻辑删除:0正常1删除',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_role_code (code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='角色表';
+
+-- ---------------------------
+-- RBAC-账号角色关联
+-- ---------------------------
+DROP TABLE IF EXISTS sys_user_role;
+CREATE TABLE sys_user_role (
+    id          BIGINT  NOT NULL AUTO_INCREMENT COMMENT '主键',
+    user_id     BIGINT  NOT NULL COMMENT '账号ID',
+    role_id     BIGINT  NOT NULL COMMENT '角色ID',
+    create_time DATETIME         DEFAULT NULL COMMENT '创建时间',
+    update_time DATETIME         DEFAULT NULL COMMENT '更新时间',
+    deleted     TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除:0正常1删除',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_user_role (user_id, role_id),
+    KEY idx_role_id (role_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='账号角色关联表';
+
+-- ---------------------------
+-- 患者基础资料(仅 PATIENT 身份)
+-- ---------------------------
+DROP TABLE IF EXISTS patient_profile;
+CREATE TABLE patient_profile (
+    id          BIGINT  NOT NULL AUTO_INCREMENT COMMENT '主键',
+    user_id     BIGINT  NOT NULL COMMENT '账号ID',
+    gender      TINYINT          DEFAULT 0 COMMENT '性别:0未知1男2女',
+    birthday    DATE             DEFAULT NULL COMMENT '生日',
+    create_time DATETIME         DEFAULT NULL COMMENT '创建时间',
+    update_time DATETIME         DEFAULT NULL COMMENT '更新时间',
+    deleted     TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除:0正常1删除',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_patient_user (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='患者基础资料';
+
+-- ---------------------------
+-- 积分账户(仅 PATIENT 身份)
+-- ---------------------------
+DROP TABLE IF EXISTS point_account;
+CREATE TABLE point_account (
+    id          BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+    user_id     BIGINT NOT NULL COMMENT '账号ID',
+    balance     INT    NOT NULL DEFAULT 0 COMMENT '积分余额',
+    create_time DATETIME         DEFAULT NULL COMMENT '创建时间',
+    update_time DATETIME         DEFAULT NULL COMMENT '更新时间',
+    deleted     TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除:0正常1删除',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_point_user (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='积分账户';
 
 -- ---------------------------
 -- 健康档案-基本信息
@@ -287,10 +346,28 @@ CREATE TABLE health_alert (
 -- =====================================================================
 -- 初始化数据 (密码均为 123456 的 BCrypt 值)
 -- =====================================================================
-INSERT INTO sys_user (username, password, nickname, role, points, status, gender, create_time, update_time, deleted)
+INSERT INTO sys_role (code, name, status, create_time, update_time, deleted)
 VALUES
-('admin',   '$2b$10$D2ZEKoZtHLLfSbUPrLBZkeev.sOTaYzMIrQeKhRERdLW6G2tkbYZS', '系统管理员', 'ADMIN', 0,   0, 1, NOW(), NOW(), 0),
-('user001', '$2b$10$D2ZEKoZtHLLfSbUPrLBZkeev.sOTaYzMIrQeKhRERdLW6G2tkbYZS', '张大爷',     'USER',  100, 0, 1, NOW(), NOW(), 0);
+('ADMIN', '管理员', 1, NOW(), NOW(), 0),
+('PATIENT', '患者', 1, NOW(), NOW(), 0),
+('DOCTOR', '医生', 1, NOW(), NOW(), 0);
+
+INSERT INTO sys_user (username, password, nickname, status, create_time, update_time, deleted)
+VALUES
+('admin',   '$2b$10$D2ZEKoZtHLLfSbUPrLBZkeev.sOTaYzMIrQeKhRERdLW6G2tkbYZS', '系统管理员', 0, NOW(), NOW(), 0),
+('user001', '$2b$10$D2ZEKoZtHLLfSbUPrLBZkeev.sOTaYzMIrQeKhRERdLW6G2tkbYZS', '张大爷',     0, NOW(), NOW(), 0);
+
+INSERT INTO sys_user_role (user_id, role_id, create_time, update_time, deleted)
+SELECT u.id, r.id, NOW(), NOW(), 0
+FROM sys_user u
+JOIN sys_role r ON (u.username = 'admin' AND r.code = 'ADMIN')
+                OR (u.username = 'user001' AND r.code = 'PATIENT');
+
+INSERT INTO patient_profile (user_id, gender, create_time, update_time, deleted)
+SELECT id, 1, NOW(), NOW(), 0 FROM sys_user WHERE username = 'user001';
+
+INSERT INTO point_account (user_id, balance, create_time, update_time, deleted)
+SELECT id, 100, NOW(), NOW(), 0 FROM sys_user WHERE username = 'user001';
 
 INSERT INTO point_product (name, category, description, points_cost, stock, status, create_time, update_time, deleted)
 VALUES
@@ -348,15 +425,21 @@ VALUES
 ('谢文斌', '主任医师',   '市第二人民医院', '泌尿外科',   '前列腺增生、泌尿系结石、尿失禁', '擅长老年前列腺疾病微创手术，累计完成手术2000余例。', 1, NOW(), NOW(), 0);
 
 -- 按医生记录顺序分配 doctor1、doctor2 ... 登录账号，密码均为 123456。
-INSERT INTO sys_user (username, password, nickname, role, points, status, gender, create_time, update_time, deleted)
+INSERT INTO sys_user (username, password, nickname, status, create_time, update_time, deleted)
 SELECT CONCAT('doctor', ranked.seq),
        '$2b$10$D2ZEKoZtHLLfSbUPrLBZkeev.sOTaYzMIrQeKhRERdLW6G2tkbYZS',
-       ranked.name, 'DOCTOR', 0, 0, 0, NOW(), NOW(), 0
+       ranked.name, 0, NOW(), NOW(), 0
 FROM (
     SELECT id, name, ROW_NUMBER() OVER (ORDER BY id) AS seq
     FROM doctor
     WHERE deleted = 0
 ) ranked;
+
+INSERT INTO sys_user_role (user_id, role_id, create_time, update_time, deleted)
+SELECT u.id, r.id, NOW(), NOW(), 0
+FROM sys_user u
+JOIN sys_role r ON r.code = 'DOCTOR'
+WHERE u.username LIKE 'doctor%';
 
 UPDATE doctor d
 JOIN (

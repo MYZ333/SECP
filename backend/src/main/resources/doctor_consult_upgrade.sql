@@ -48,10 +48,10 @@ CREATE TABLE IF NOT EXISTS doctor_consult_message (
 
 -- 按医生记录顺序分配 doctor1、doctor2 ... 登录账号，密码均为 123456。
 -- ON DUPLICATE KEY UPDATE 让账号部分可重复执行，并覆盖全部现有医生。
-INSERT INTO sys_user (username, password, nickname, role, points, status, gender, create_time, update_time, deleted)
+INSERT INTO sys_user (username, password, nickname, status, create_time, update_time, deleted)
 SELECT CONCAT('doctor', ranked.seq),
        '$2b$10$D2ZEKoZtHLLfSbUPrLBZkeev.sOTaYzMIrQeKhRERdLW6G2tkbYZS',
-       ranked.name, 'DOCTOR', 0, 0, 0, NOW(), NOW(), 0
+       ranked.name, 0, NOW(), NOW(), 0
 FROM (
     SELECT id, name, ROW_NUMBER() OVER (ORDER BY id) AS seq
     FROM doctor
@@ -60,10 +60,16 @@ FROM (
 ON DUPLICATE KEY UPDATE
 password = VALUES(password),
 nickname = VALUES(nickname),
-role = 'DOCTOR',
 status = 0,
 deleted = 0,
 update_time = NOW();
+
+INSERT INTO sys_user_role (user_id, role_id, create_time, update_time, deleted)
+SELECT u.id, r.id, NOW(), NOW(), 0
+FROM sys_user u
+JOIN sys_role r ON r.code = 'DOCTOR'
+WHERE u.username LIKE 'doctor%'
+ON DUPLICATE KEY UPDATE deleted = 0, update_time = NOW();
 
 UPDATE doctor d
 JOIN (
