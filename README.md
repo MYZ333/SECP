@@ -69,38 +69,6 @@ mysql -u root -p -e "USE hda_db; SELECT username, role FROM sys_user;"
 
 能看到 `admin`、`user001` 以及 `doctor1` 至 `doctor20` 即成功。
 
-### 已有数据库升级
-
-如果数据库已经由旧版 `schema.sql` 初始化，不要重新执行会清表的完整初始化脚本。先执行医生咨询结构升级脚本：
-
-```powershell
-mysql -u root -p --default-character-set=utf8mb4 -e "source backend/src/main/resources/doctor_consult_upgrade.sql"
-```
-
-如果之前已经执行过医生咨询升级，只需要补充或重置全部现有医生账号：
-
-```powershell
-mysql -u root -p --default-character-set=utf8mb4 -e "source backend/src/main/resources/doctor_seed_accounts.sql"
-```
-
-账号脚本会按 `doctor.id` 顺序自动生成 `doctor1`、`doctor2`……，统一密码 `123456`，并将账号关联到对应医生。脚本可重复执行；新增医生后再次执行，会继续按数字后缀分配。
-
-如果数据库已存在，且需要启用健康助手或应用使用助手，只需额外执行**一次**以下升级脚本；它会创建 Agent 会话索引、Spring AI MySQL 持久化记忆表，并为知识库增加助手类型字段，用于隔离健康资料与平台功能资料：
-
-```powershell
-mysql -u root -p --default-character-set=utf8mb4 -e "source backend/src/main/resources/agent_chat_upgrade.sql"
-```
-
-全新初始化数据库时只执行 `schema.sql` 即可，已包含上述两张 Agent 表；项目启动不会自动重复建表。
-
-在 Windows PowerShell 中执行时，请先切换到项目根目录后运行：
-
-```powershell
-cd E:\SECP
-mysql -u root -p --default-character-set=utf8mb4 -e "source backend/src/main/resources/agent_chat_upgrade.sql"
-```
-
-命令执行后按提示输入 MySQL 的 `root` 密码；出现 `Query OK` 即表示成功。若使用 Navicat、DataGrip 或 MySQL Workbench，请连接到 `hda_db` 数据库，打开 `backend/src/main/resources/agent_chat_upgrade.sql`，点击“运行/执行”即可。不要对已有数据库重新执行会清空数据的 `schema.sql`。
 
 ## 第 2 步：改数据库连接配置
 
@@ -132,23 +100,46 @@ $env:AI_DASHSCOPE_WORKSPACE_ID = "你的 Workspace ID"
 
 聊天模型默认 `qwen3.7-plus`，Embedding 默认 `text-embedding-v4`（1024 维），重排默认 `qwen3-rerank`。不配置 Workspace ID 时，RAG 会保留向量召回顺序，不会影响系统启动。
 
+RAG 查询会先由聊天模型改写成独立的语义检索句和关键词；没有配置真实 API Key 时自动使用规则改写。召回阶段并行使用 Chroma 向量检索和 MySQL 已发布知识切片的关键词检索，再以加权 RRF 融合后送入重排模型。任一召回通道不可用时会自动使用另一个通道。可通过 `RAG_QUERY_REWRITE_ENABLED=false` 或 `RAG_HYBRID_ENABLED=false` 分别关闭模型改写或关键词召回。
+
+个体症状、病因询问和个体化建议会先经过逐步问诊门控：每轮只询问 1 个关键问题，并提供快捷选项和自由回答；信息足够后才汇总全部回答并启动咨询与 RAG，纯健康科普则直接检索回答。默认最多追问 6 轮以避免循环，用户也可以回复“直接回答”或“不知道”跳过剩余追问，系统会明确说明信息局限。可通过 `AGENT_INTAKE_MAX_ROUNDS` 调整上限，通过 `AGENT_INTAKE_ENABLED=false` 关闭模型门控并使用规则降级。
+
 知识文档默认启用 Embedding 语义分块：标题为强边界，以句子上下文向量的相邻余弦距离识别主题突变点；默认使用第 80 百分位、绝对距离 0.12、最小 280 字和最大 1100 字。可通过 `RAG_SEMANTIC_CHUNKING_ENABLED=false` 临时降级到章节/标点规则分块。
 
 已有知识文档需要在管理端点击“重建索引”才会重新读取原文件并应用语义分块；仅重启后端不会修改历史 chunk。没有保留原始文件的旧文档请重新上传。
 
 ### 启动 Chroma（原生安装，无 Docker）
+注意：如果你本机有chroma，执行chroma run --host 0.0.0.0 --port 8000即可。下面的脚本有问题，可以不管
+首次运行先安装项目锁定的 Chroma 版本。脚本使用独立 Python 虚拟环境，不会污染全局 Python：
 
-新开一个 PowerShell，在项目根目录运行：
+```powershell
+.\scripts\install-chroma.ps1
+```
+
+新开一个 PowerShell，在项目根目录以前台方式运行：
 
 ```powershell
 .\scripts\start-chroma.ps1
 ```
 
-看到 Chroma 监听 `http://localhost:8000` 后保持窗口运行。数据持久化到项目的 `data/rag/chroma/`，可用以下命令检查：
+也可以后台启动、检查和停止：
 
 ```powershell
-Invoke-RestMethod http://localhost:8000/api/v2/heartbeat
+.\scripts\start-chroma.ps1 -Background
+.\scripts\test-chroma.ps1
+.\scripts\stop-chroma.ps1
 ```
+
+看到 Chroma 监听 `http://127.0.0.1:8000` 后即表示启动成功。数据持久化到项目的 `data/rag/chroma/`；后台日志也位于该目录。
+
+如果临时不使用 AI/RAG，只想启动其余后端功能，可在启动后端前设置：
+
+```powershell
+$env:RAG_ENABLED = "false"
+$env:AI_VECTOR_STORE_TYPE = "none"
+```
+
+Docker 部署无需单独安装 Chroma，`deploy/docker-compose.yml` 已包含固定版本的 Chroma 服务、持久化卷和健康检查。
 
 健康助手接口：
 
@@ -356,3 +347,43 @@ com.medcare.hda
 - 登录成功返回 JWT，前端存 localStorage，请求头自动带 `Authorization: Bearer <token>`。
 - 白名单：登录、注册、Knife4j 文档；`/api/admin/**` 需要 `ADMIN` 角色。
 - 登录态同时写入 Redis（`hda:login:token:{userId}`）。
+
+## Chroma 首次初始化与验收
+
+Chroma 服务启动成功不代表知识库已经有数据。后端启动时只自动创建或复用
+`medical_knowledge` 和 `long_term_memory` 两个集合，不会自动导入种子语料，也不会补齐缺失向量。
+
+本地首次启动：
+
+```powershell
+.\scripts\install-chroma.ps1
+.\scripts\start-chroma.ps1 -Background
+Set-Location backend
+mvn spring-boot:run
+```
+
+后端启动完成后，由管理员登录 Web 端进入“智能体知识库”，选择助手并点击“导入首批语料”，
+预览分块后逐份发布。发布时才会调用 Embedding 模型并写入 Chroma。随后可在项目根目录验证集合和记录数：
+
+```powershell
+.\scripts\test-chroma.ps1
+```
+
+也可以运行 `.\scripts\bootstrap-chroma.ps1` 启动 Chroma；知识语料仍需在管理界面手动导入和发布。
+尚未手动发布语料时，`medical_knowledge` 为空是正常现象。
+
+全新 MySQL 使用完整的 `backend/src/main/resources/schema.sql`。已有数据库不要删除数据卷，执行：
+
+```powershell
+mysql -u root -p --default-character-set=utf8mb4 -e "source backend/src/main/resources/long_term_memory_upgrade.sql"
+```
+
+Docker 首次启动会自动执行完整 SQL，并由后端自动创建 Chroma collection，但不会自动填充知识向量：
+
+```powershell
+Set-Location deploy
+docker compose up -d --build
+docker compose logs -f backend
+```
+
+容器启动后仍需在管理员知识库界面手动导入并发布首批语料。

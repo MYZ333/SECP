@@ -5,6 +5,9 @@ import com.medcare.hda.agent.api.AgentStageUpdate;
 import com.medcare.hda.agent.api.AgentStreamEvent;
 import com.medcare.hda.agent.repository.AgentAuditRepository;
 import com.medcare.hda.agent.repository.AgentConversationRepository;
+import com.medcare.hda.agent.repository.ClinicalIntakeStateRepository;
+import com.medcare.hda.agent.memory.LongTermMemoryService;
+import com.medcare.hda.agent.memory.MemorySourceAgent;
 import com.medcare.hda.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -12,6 +15,7 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -24,7 +28,6 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class HealthAssistantAgentService {
-
     public static final String SYSTEM_PROMPT = """
             你是一名面向普通用户的“健康信息与就医辅助助手”。你帮助用户理解健康问题、识别风险、准备就医沟通，但不能替代医生诊断、开具处方或决定治疗方案。
             必须遵守：
@@ -42,6 +45,10 @@ public class HealthAssistantAgentService {
     private final HealthAgentOrchestrator orchestrator;
     private final OutputSafetyService outputSafetyService;
     private final AgentAuditRepository auditRepository;
+    private final ClinicalIntakeStateRepository intakeStateRepository;
+
+    @Autowired(required = false)
+    private LongTermMemoryService longTermMemoryService;
 
     public AgentConversation prepareConversation(Long userId, String sessionId) {
         return conversationRepository.resolve(userId, sessionId);
@@ -51,7 +58,8 @@ public class HealthAssistantAgentService {
         Execution execution = execute(userId, conversation, message, useHealthProfile);
         PreparedAgentResponse prepared = execution.prepared();
         return new AgentChatResponse(conversation.sessionId(), execution.content(), "assistant",
-                prepared.risk().level(), prepared.citations(), prepared.usedProfileCategories(), prepared.traceId());
+                prepared.risk().level(), prepared.citations(), prepared.usedProfileCategories(), prepared.traceId(),
+                prepared.intakeQuestion());
     }
 
     public Flux<AgentStreamEvent> stream(Long userId, AgentConversation conversation, String message, boolean useHealthProfile) {
@@ -81,7 +89,7 @@ public class HealthAssistantAgentService {
 
         StreamingSafetyWindow safetyWindow = new StreamingSafetyWindow(outputSafetyService, prepared.risk());
         Flux<AgentStreamEvent> modelDeltas = healthAssistantChatClient.prompt()
-                .system(prepared.systemPrompt())
+                .system(withLongTermMemory(userId, message, prepared.systemPrompt()))
                 .messages(healthAssistantChatMemory.get(conversation.conversationId()))
                 .user(message)
                 .stream()
@@ -116,7 +124,9 @@ public class HealthAssistantAgentService {
                     conversationRepository.touch(userId, conversation.sessionId());
                     auditRepository.saveTurn(userId, conversation.sessionId(), prepared.traceId(), message, content,
                             prepared.risk().level(), prepared.citations(), prepared.usedProfileCategories());
+                    completeIntakeIfFinished(userId, conversation.sessionId(), prepared);
                     auditRepository.complete(prepared.traceId(), System.currentTimeMillis() - start, null);
+                    enqueueLongTermMemory(userId, conversation, message, prepared.traceId(), content);
                 })
                 .subscribeOn(Schedulers.boundedElastic())
                 .thenReturn(AgentStreamEvent.done());
@@ -132,7 +142,7 @@ public class HealthAssistantAgentService {
                 raw = prepared.directContent();
             } else {
                 raw = healthAssistantChatClient.prompt()
-                        .system(prepared.systemPrompt())
+                        .system(withLongTermMemory(userId, message, prepared.systemPrompt()))
                         .messages(healthAssistantChatMemory.get(conversation.conversationId()))
                         .user(message).call().content();
             }
@@ -142,7 +152,9 @@ public class HealthAssistantAgentService {
             conversationRepository.touch(userId, conversation.sessionId());
             auditRepository.saveTurn(userId, conversation.sessionId(), prepared.traceId(), message, content,
                     prepared.risk().level(), prepared.citations(), prepared.usedProfileCategories());
+            completeIntakeIfFinished(userId, conversation.sessionId(), prepared);
             auditRepository.complete(prepared.traceId(), System.currentTimeMillis() - start, null);
+            enqueueLongTermMemory(userId, conversation, message, prepared.traceId(), content);
             return new Execution(prepared, content);
         } catch (Exception e) {
             if (prepared != null) auditRepository.complete(prepared.traceId(), System.currentTimeMillis() - start, "AGENT_EXECUTION_FAILED");
@@ -155,6 +167,7 @@ public class HealthAssistantAgentService {
         List<AgentStreamEvent> events = new ArrayList<>();
         events.add(AgentStreamEvent.meta(conversation.sessionId(), prepared.traceId(), prepared.usedProfileCategories()));
         events.add(AgentStreamEvent.risk(prepared.risk().level(), prepared.risk().message()));
+        if (prepared.intakeQuestion() != null) events.add(AgentStreamEvent.intake(prepared.intakeQuestion()));
         return events;
     }
 
@@ -173,6 +186,23 @@ public class HealthAssistantAgentService {
             return "百炼密钥无效或未配置，请检查 APIKEY";
         }
         return "健康助手暂时不可用，请稍后再试";
+    }
+
+    private void completeIntakeIfFinished(Long userId, String sessionId, PreparedAgentResponse prepared) {
+        if (!"CLARIFICATION".equals(prepared.route())) intakeStateRepository.complete(userId, sessionId);
+    }
+
+    private String withLongTermMemory(Long userId, String message, String systemPrompt) {
+        if (longTermMemoryService == null) return systemPrompt;
+        return systemPrompt + longTermMemoryService.promptContext(userId, message, MemorySourceAgent.HEALTH);
+    }
+
+    private void enqueueLongTermMemory(Long userId, AgentConversation conversation, String message,
+                                       String traceId, String content) {
+        if (longTermMemoryService != null) {
+            longTermMemoryService.enqueueTurn(userId, MemorySourceAgent.HEALTH, conversation.sessionId(), traceId,
+                    message, content);
+        }
     }
 
     private record Execution(PreparedAgentResponse prepared, String content) {}

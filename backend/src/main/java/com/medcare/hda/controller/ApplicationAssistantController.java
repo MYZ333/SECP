@@ -5,6 +5,7 @@ import com.medcare.hda.agent.core.ApplicationAssistantService;
 import com.medcare.hda.annotation.RateLimit;
 import com.medcare.hda.common.ratelimit.LimitDimension;
 import com.medcare.hda.dto.ApplicationAssistantChatDTO;
+import com.medcare.hda.security.SecurityUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
@@ -35,7 +36,7 @@ public class ApplicationAssistantController {
             HttpServletResponse response) {
         response.setHeader("Cache-Control", "no-cache, no-transform");
         response.setHeader("X-Accel-Buffering", "no");
-        return applicationAssistantService.stream(dto.getMessage())
+        return applicationAssistantService.stream(SecurityUtil.getUserId(), dto.getMessage())
                 .map(data -> event(data.type(), data))
                 .onErrorResume(error -> Flux.just(event("error",
                         AgentStreamEvent.error("应用助手暂时不可用，请稍后再试"))));

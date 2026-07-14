@@ -2,6 +2,7 @@ package com.medcare.hda.controller;
 
 import com.medcare.hda.agent.api.AgentChatResponse;
 import com.medcare.hda.agent.api.AgentHistoryMessage;
+import com.medcare.hda.agent.api.AgentSessionSummary;
 import com.medcare.hda.agent.api.AgentStreamEvent;
 import com.medcare.hda.agent.core.AgentConversation;
 import com.medcare.hda.agent.core.HealthAssistantAgentService;
@@ -27,6 +28,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
+
+import java.util.List;
 
 @Tag(name = "健康咨询", description = "健康助手 Agent 对话")
 @RestController
@@ -75,6 +78,12 @@ public class ConsultController {
                                                             @RequestParam(defaultValue = "20") long pageSize) {
         Long userId = SecurityUtil.getUserId();
         return Result.success(conversationRepository.pageHistory(userId, sessionId, pageNum, pageSize));
+    }
+
+    @Operation(summary = "健康助手最近会话列表")
+    @GetMapping("/sessions")
+    public Result<List<AgentSessionSummary>> sessions() {
+        return Result.success(conversationRepository.listSessions(SecurityUtil.getUserId()));
     }
 
     private ServerSentEvent<AgentStreamEvent> event(String name, AgentStreamEvent data) {

@@ -125,6 +125,24 @@ PREPARE hda_stmt FROM @ddl; EXECUTE hda_stmt; DEALLOCATE PREPARE hda_stmt;
 DROP PROCEDURE IF EXISTS hda_rename_column_if_needed;
 DROP PROCEDURE IF EXISTS hda_add_column_if_needed;
 
+CREATE TABLE IF NOT EXISTS agent_consult_state (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    user_id BIGINT NOT NULL,
+    session_id VARCHAR(36) NOT NULL,
+    episode_id VARCHAR(36) NOT NULL,
+    phase VARCHAR(20) NOT NULL DEFAULT 'COLLECTING',
+    round_count INT NOT NULL DEFAULT 0,
+    initial_question TEXT NOT NULL,
+    clinical_summary MEDIUMTEXT DEFAULT NULL,
+    known_facts_json JSON DEFAULT NULL,
+    missing_fields_json JSON DEFAULT NULL,
+    create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_consult_state_user_session (user_id, session_id),
+    KEY idx_consult_state_phase (phase, update_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='健康助手多轮问诊状态';
+
 CREATE TABLE IF NOT EXISTS agent_run (
     id BIGINT NOT NULL AUTO_INCREMENT,
     trace_id VARCHAR(36) NOT NULL,

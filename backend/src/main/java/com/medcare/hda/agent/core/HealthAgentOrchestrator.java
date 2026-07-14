@@ -5,6 +5,7 @@ import com.medcare.hda.agent.api.AgentStageUpdate;
 import com.medcare.hda.agent.knowledge.KnowledgeHit;
 import com.medcare.hda.agent.knowledge.KnowledgeRetrievalService;
 import com.medcare.hda.agent.repository.AgentAuditRepository;
+import com.medcare.hda.agent.repository.ClinicalIntakeStateRepository;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,6 +23,8 @@ import java.util.function.Consumer;
 public class HealthAgentOrchestrator {
     private final HealthContextService healthContextService;
     private final SafetyTriageService triageService;
+    private final ClinicalIntakeService intakeService;
+    private final ClinicalIntakeStateRepository intakeStateRepository;
     private final KnowledgeRetrievalService retrievalService;
     private final AgentAuditRepository auditRepository;
     private final ChatClient chatClient;
@@ -30,6 +33,8 @@ public class HealthAgentOrchestrator {
 
     public HealthAgentOrchestrator(HealthContextService healthContextService,
                                    SafetyTriageService triageService,
+                                   ClinicalIntakeService intakeService,
+                                   ClinicalIntakeStateRepository intakeStateRepository,
                                    KnowledgeRetrievalService retrievalService,
                                    AgentAuditRepository auditRepository,
                                    ChatClient healthAssistantChatClient,
@@ -37,6 +42,8 @@ public class HealthAgentOrchestrator {
                                    @Value("${hda.agent.orchestration.worker-timeout-seconds:20}") int timeoutSeconds) {
         this.healthContextService = healthContextService;
         this.triageService = triageService;
+        this.intakeService = intakeService;
+        this.intakeStateRepository = intakeStateRepository;
         this.retrievalService = retrievalService;
         this.auditRepository = auditRepository;
         this.chatClient = healthAssistantChatClient;
@@ -60,16 +67,34 @@ public class HealthAgentOrchestrator {
         List<AgentStageUpdate> stages = new ArrayList<>();
 
         HealthContext healthContext = healthContextService.load(userId, useProfile);
-        RiskAssessment risk = triageService.assess(message, healthContext);
+        ClinicalIntakeState intakeState = intakeStateRepository.findActive(userId, conversation.sessionId()).orElse(null);
+        RiskAssessment risk = triageService.assess(safetyInput(message, intakeState), healthContext);
         report(stages, stageReporter, AgentStageUpdate.completed("SAFETY_CHECK", risk.message()));
         auditRepository.step(traceId, "safety_triage", "COMPLETED", risk.level(), 0);
         if (risk.emergency()) {
             auditRepository.route(traceId, "SAFETY_SHORT_CIRCUIT", risk.level());
             return new PreparedAgentResponse(traceId, risk, List.of(), healthContext.categories(), stages,
-                    "SAFETY_SHORT_CIRCUIT", null, emergencyAnswer(risk));
+                    "SAFETY_SHORT_CIRCUIT", null, emergencyAnswer(risk), null);
         }
 
-        boolean evidenceNeeded = needsEvidence(message);
+        report(stages, stageReporter, AgentStageUpdate.running("CLARIFYING", "正在判断现有信息是否足以提供安全建议"));
+        ClinicalIntakeAssessment intake = intakeService.assess(message, intakeState, healthContext);
+        auditRepository.step(traceId, "clinical_intake", "COMPLETED", intake.decision().name(), 0);
+        if (intake.decision() == ClinicalIntakeAssessment.Decision.ASK) {
+            intakeStateRepository.saveClarification(userId, conversation.sessionId(), message, intakeState, intake);
+            auditRepository.route(traceId, "CLARIFICATION", risk.level());
+            report(stages, stageReporter, AgentStageUpdate.completed("CLARIFYING", "还需要补充少量关键信息，本轮暂不进行病因分析"));
+            return new PreparedAgentResponse(traceId, risk, List.of(), healthContext.categories(), stages,
+                    "CLARIFICATION", null, clarificationAnswer(intake, risk), intake.question());
+        }
+        report(stages, stageReporter, AgentStageUpdate.completed("CLARIFYING",
+                intake.decision() == ClinicalIntakeAssessment.Decision.DIRECT_EDUCATION
+                        ? "这是一般健康知识问题，可以直接检索权威资料"
+                        : "已收集到可用于保守健康建议的必要信息"));
+        String summaryQuery = intake.clinicalSummary();
+        final String clinicalQuery = summaryQuery == null || summaryQuery.isBlank() ? message : summaryQuery;
+
+        boolean evidenceNeeded = needsEvidence(clinicalQuery);
         String route = evidenceNeeded ? "CONSULTATION+EVIDENCE" : "CONSULTATION";
         auditRepository.route(traceId, route, risk.level());
         report(stages, stageReporter, AgentStageUpdate.completed("ROUTING", evidenceNeeded
@@ -80,12 +105,12 @@ public class HealthAgentOrchestrator {
         }
 
         CompletableFuture<String> consultation = CompletableFuture.supplyAsync(
-                () -> consultationWorker(traceId, message, healthContext, risk), executor)
+                () -> consultationWorker(traceId, clinicalQuery, healthContext, risk), executor)
                 .orTimeout(timeoutSeconds, TimeUnit.SECONDS)
                 .exceptionally(error -> "咨询模块未能在时限内完成，请基于可靠资料给出保守回答。");
 
         CompletableFuture<List<KnowledgeHit>> evidence = evidenceNeeded
-                ? CompletableFuture.supplyAsync(() -> evidenceWorker(traceId, message), executor)
+                ? CompletableFuture.supplyAsync(() -> evidenceWorker(traceId, clinicalQuery), executor)
                     .orTimeout(timeoutSeconds, TimeUnit.SECONDS).exceptionally(error -> List.of())
                 : CompletableFuture.completedFuture(List.of());
 
@@ -111,8 +136,8 @@ public class HealthAgentOrchestrator {
         report(stages, stageReporter, AgentStageUpdate.running("SYNTHESIZING", "正在整合风险评估、护理建议与检索结果，生成可执行的回答"));
 
         List<AgentCitation> citations = hits.stream().map(KnowledgeHit::citation).toList();
-        String prompt = synthesisPrompt(consultationResult, hits, healthContext, risk);
-        return new PreparedAgentResponse(traceId, risk, citations, healthContext.categories(), stages, route, prompt, null);
+        String prompt = synthesisPrompt(consultationResult, hits, healthContext, risk, intake.insufficient());
+        return new PreparedAgentResponse(traceId, risk, citations, healthContext.categories(), stages, route, prompt, null, null);
     }
 
     private void report(List<AgentStageUpdate> stages, Consumer<AgentStageUpdate> reporter, AgentStageUpdate update) {
@@ -133,13 +158,14 @@ public class HealthAgentOrchestrator {
 
     private List<KnowledgeHit> evidenceWorker(String traceId, String message) {
         long start = System.currentTimeMillis();
-        List<KnowledgeHit> hits = retrievalService.search(rewriteQuery(message));
+        List<KnowledgeHit> hits = retrievalService.search(message);
         auditRepository.step(traceId, "evidence_agent", hits.isEmpty() ? "DEGRADED" : "COMPLETED",
                 hits.isEmpty() ? "无可靠知识命中" : "命中 " + hits.size() + " 条资料", System.currentTimeMillis() - start);
         return hits;
     }
 
-    private String synthesisPrompt(String consultation, List<KnowledgeHit> hits, HealthContext context, RiskAssessment risk) {
+    private String synthesisPrompt(String consultation, List<KnowledgeHit> hits, HealthContext context,
+                                   RiskAssessment risk, boolean insufficient) {
         StringBuilder evidence = new StringBuilder();
         for (int i = 0; i < hits.size(); i++) {
             KnowledgeHit hit = hits.get(i);
@@ -156,6 +182,9 @@ public class HealthAgentOrchestrator {
 
                 风险等级：""" + risk.level() + "\n风险说明：" + risk.message()
                 + "\n用户授权健康上下文：" + context.summary()
+                + "\n信息完整性要求：" + (insufficient
+                ? "用户选择跳过追问或已达到追问上限。必须明确说明信息不足，不得给出确定病因，并列出仍需观察或就医补充的信息。"
+                : "已完成必要的信息完整度检查，仍不得将可能方向表述为确诊。")
                 + "\n咨询工作摘要：\n" + consultation
                 + "\n\n权威资料区：\n" + (evidence.isEmpty() ? "未检索到可靠资料。" : evidence);
     }
@@ -166,8 +195,22 @@ public class HealthAgentOrchestrator {
         return true;
     }
 
-    private String rewriteQuery(String message) {
-        return message + " 国家卫生健康委员会 健康科普 科学就医";
+    private String safetyInput(String message, ClinicalIntakeState state) {
+        if (state == null) return message;
+        return state.initialQuestion() + "\n" + state.clinicalSummary() + "\n" + message;
+    }
+
+    private String clarificationAnswer(ClinicalIntakeAssessment intake, RiskAssessment risk) {
+        StringBuilder answer = new StringBuilder("为了逐步补全问诊信息，请回答下面这个问题：\n\n");
+        answer.append(intake.question().prompt());
+        if (!intake.question().options().isEmpty()) {
+            answer.append("\n\n可选答案：").append(String.join(" / ", intake.question().options()));
+        }
+        if ("MEDIUM".equals(risk.level()) || "HIGH".equals(risk.level())) {
+            answer.append("\n目前已有信息提示需要谨慎处理；如果症状明显加重或出现危险信号，请不要等待线上追问，及时就医。");
+        }
+        answer.append("\n\n也可以自由填写；如果不清楚，可以回答“不知道”或“先按现有信息回答”。");
+        return answer.toString().trim();
     }
 
     private String emergencyAnswer(RiskAssessment risk) {

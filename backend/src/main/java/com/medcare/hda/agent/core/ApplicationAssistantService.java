@@ -3,9 +3,12 @@ package com.medcare.hda.agent.core;
 import com.medcare.hda.agent.api.AgentStreamEvent;
 import com.medcare.hda.agent.knowledge.KnowledgeHit;
 import com.medcare.hda.agent.knowledge.KnowledgeRetrievalService;
+import com.medcare.hda.agent.memory.LongTermMemoryService;
+import com.medcare.hda.agent.memory.MemorySourceAgent;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
@@ -28,6 +31,9 @@ public class ApplicationAssistantService {
     private final ChatClient chatClient;
     private final KnowledgeRetrievalService retrievalService;
 
+    @Autowired(required = false)
+    private LongTermMemoryService longTermMemoryService;
+
     public ApplicationAssistantService(@Qualifier("healthAssistantChatClient") ChatClient chatClient,
                                        KnowledgeRetrievalService retrievalService) {
         this.chatClient = chatClient;
@@ -35,16 +41,36 @@ public class ApplicationAssistantService {
     }
 
     public Flux<AgentStreamEvent> stream(String message) {
+        return stream(null, message);
+    }
+
+    public Flux<AgentStreamEvent> stream(Long userId, String message) {
+        StringBuilder answer = new StringBuilder();
         Flux<AgentStreamEvent> deltas = chatClient.prompt()
-                .system(promptWithKnowledge(message))
+                .system(promptWithKnowledgeAndMemory(userId, message))
                 .user(message)
                 .stream()
                 .content()
                 .filter(token -> token != null && !token.isEmpty())
-                .map(AgentStreamEvent::delta);
+                .map(token -> {
+                    answer.append(token);
+                    return AgentStreamEvent.delta(token);
+                });
 
         return Flux.concat(deltas, Flux.just(AgentStreamEvent.done()))
+                .doOnComplete(() -> {
+                    if (userId != null && longTermMemoryService != null) {
+                        longTermMemoryService.enqueueTurn(userId, MemorySourceAgent.APPLICATION, null, null,
+                                message, answer.toString());
+                    }
+                })
                 .doOnError(error -> log.error("应用使用助手流式调用失败", error));
+    }
+
+    private String promptWithKnowledgeAndMemory(Long userId, String message) {
+        String prompt = promptWithKnowledge(message);
+        if (userId == null || longTermMemoryService == null) return prompt;
+        return prompt + longTermMemoryService.promptContext(userId, message, MemorySourceAgent.APPLICATION);
     }
 
     private String promptWithKnowledge(String message) {

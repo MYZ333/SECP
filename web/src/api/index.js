@@ -65,17 +65,21 @@ export const pageDoctors = (params) => request.get('/doctor/page', { params })
 export const getDoctorDepartments = () => request.get('/doctor/departments')
 export const consultChat = (data) => request.post('/consult/chat', data)
 export const consultHistory = (params) => request.get('/consult/history', { params })
+export const consultSessions = () => request.get('/consult/sessions')
 
 export const adminPageKnowledge = (params) => request.get('/admin/knowledge/page', { params })
 export const adminKnowledgeChunks = (id) => request.get(`/admin/knowledge/${id}/chunks`)
-export const adminUploadKnowledge = (formData) => request.post('/admin/knowledge', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
-export const adminImportKnowledgeSeeds = () => request.post('/admin/knowledge/seed')
+const KNOWLEDGE_PARSE_TIMEOUT = 120000
+export const adminUploadKnowledge = (formData) => request.post('/admin/knowledge', formData, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: KNOWLEDGE_PARSE_TIMEOUT })
+export const adminImportKnowledgeSeeds = () => request.post('/admin/knowledge/seed', null, { timeout: KNOWLEDGE_PARSE_TIMEOUT })
 export const adminPublishKnowledge = (id) => request.post(`/admin/knowledge/${id}/publish`)
-export const adminReindexKnowledge = (id) => request.post(`/admin/knowledge/${id}/reindex`)
 export const adminInactiveKnowledge = (id) => request.put(`/admin/knowledge/${id}/inactive`)
+export const adminDeleteKnowledge = (id) => request.delete(`/admin/knowledge/${id}`)
+export const adminPublishKnowledgeBatch = (ids) => request.post('/admin/knowledge/batch/publish', ids, { timeout: 120000 })
+export const adminInactiveKnowledgeBatch = (ids) => request.put('/admin/knowledge/batch/inactive', ids)
 export const adminPageApplicationKnowledge = (params) => request.get('/admin/knowledge/application/page', { params })
-export const adminUploadApplicationKnowledge = (formData) => request.post('/admin/knowledge/application', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
-export const adminImportApplicationKnowledgeSeeds = () => request.post('/admin/knowledge/application/seed')
+export const adminUploadApplicationKnowledge = (formData) => request.post('/admin/knowledge/application', formData, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: KNOWLEDGE_PARSE_TIMEOUT })
+export const adminImportApplicationKnowledgeSeeds = () => request.post('/admin/knowledge/application/seed', null, { timeout: KNOWLEDGE_PARSE_TIMEOUT })
 
 // Axios 不直接消费浏览器 POST 响应流；AI 助手接口统一使用 fetch 解析 SSE。
 async function postSseStream (url, data, handlers, assistantName) {
@@ -116,6 +120,7 @@ async function postSseStream (url, data, handlers, assistantName) {
     else if (type === 'stage') handlers.onStage?.(event)
     else if (type === 'risk') handlers.onRisk?.(event)
     else if (type === 'citation') handlers.onCitation?.(event.citation)
+    else if (type === 'intake') handlers.onIntake?.(event.intakeQuestion)
     else if (type === 'delta') handlers.onDelta?.(event.content || '')
     else if (type === 'done') handlers.onDone?.()
     else if (type === 'error') throw new Error(event.content || `${assistantName}暂时不可用`)
@@ -143,6 +148,7 @@ export function consultChatStream (data, handlers = {}) {
 export function applicationAssistantChatStream (data, handlers = {}) {
   return postSseStream('/app-assistant/chat/stream', data, handlers, '应用助手')
 }
+
 export const startDoctorSession = (doctorId) => request.post(`/doctor-consult/session/${doctorId}`)
 export const pageDoctorConsultSessions = (params) => request.get('/doctor-consult/sessions', { params })
 export const getDoctorConsultMessages = (sessionId) => request.get(`/doctor-consult/session/${sessionId}/messages`)
