@@ -80,3 +80,6 @@ android/
 apk-output/
 .vite/
 
+# ---------- Local planning and runtime uploads ----------
+/SECP/
+/backend/uploads/

@@ -170,7 +170,7 @@ public class HealthAssistantAgentService {
     private String friendlyMessage(Throwable exception) {
         String detail = exception.getMessage();
         if (detail != null && (detail.contains("401") || detail.contains("api-key") || detail.contains("API key"))) {
-            return "百炼密钥无效或未配置，请检查 AI_DASHSCOPE_API_KEY";
+            return "百炼密钥无效或未配置，请检查 APIKEY";
         }
         return "健康助手暂时不可用，请稍后再试";
     }

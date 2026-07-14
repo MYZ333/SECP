@@ -122,15 +122,15 @@ spring:
 
 ### 配置阿里云百炼
 
-健康助手使用 Spring AI 1.0.9 与 Spring AI Alibaba，对接阿里云百炼聊天、向量化与重排模型。启动前必须设置 `AI_DASHSCOPE_API_KEY` 环境变量，密钥不会写入项目配置文件：
+健康助手使用 Spring AI 1.0.9 与 Spring AI Alibaba，对接阿里云百炼聊天、向量化与重排模型。未配置密钥时后端仍可启动；使用聊天、向量化或重排功能前需要设置 `APIKEY` 环境变量，密钥不会写入项目配置文件：
 
 ```powershell
-$env:AI_DASHSCOPE_API_KEY = "你的百炼 API Key"       # 仅当前 PowerShell 会话
+$env:APIKEY = "你的百炼 API Key"                     # 仅当前 PowerShell 会话
 # 使用 qwen3-rerank 时按百炼控制台填写 Workspace ID
 $env:AI_DASHSCOPE_WORKSPACE_ID = "你的 Workspace ID"
 ```
 
-聊天模型默认 `qwen-plus`，Embedding 默认 `text-embedding-v4`（1024 维），重排默认 `qwen3-rerank`。不配置 Workspace ID 时，RAG 会保留向量召回顺序，不会影响系统启动。
+聊天模型默认 `qwen3.7-plus`，Embedding 默认 `text-embedding-v4`（1024 维），重排默认 `qwen3-rerank`。不配置 Workspace ID 时，RAG 会保留向量召回顺序，不会影响系统启动。
 
 知识文档默认启用 Embedding 语义分块：标题为强边界，以句子上下文向量的相邻余弦距离识别主题突变点；默认使用第 80 百分位、绝对距离 0.12、最小 280 字和最大 1100 字。可通过 `RAG_SEMANTIC_CHUNKING_ENABLED=false` 临时降级到章节/标点规则分块。
 
