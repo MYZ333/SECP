@@ -1,5 +1,6 @@
 import request from './request'
 import { encryptPassword } from './crypto'
+import { createWebSocketUrl } from '@/config/server'
 
 export const login = async (data) =>
   request.post('/auth/login', { ...data, password: await encryptPassword(data.password) })
@@ -23,6 +24,5 @@ export const uploadAvatar = (formData) =>
 
 export function doctorWsUrl() {
   const token = localStorage.getItem('doctorToken') || ''
-  const protocol = location.protocol === 'https:' ? 'wss' : 'ws'
-  return `${protocol}://${location.host}/ws/doctor-consult?token=${encodeURIComponent(token)}`
+  return createWebSocketUrl('/ws/doctor-consult', { token })
 }

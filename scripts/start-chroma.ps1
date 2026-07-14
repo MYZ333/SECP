@@ -12,7 +12,7 @@ New-Item -ItemType Directory -Path $resolvedDataPath -Force | Out-Null
 
 $chromaCommand = Get-Command chroma -ErrorAction SilentlyContinue
 if (-not $chromaCommand) {
-    $knownPath = "D:\Python\python3.10.8\Scripts\chroma.exe"
+    $knownPath = "D:\Chroma\venv\Scripts\chroma.exe"
     if (Test-Path -LiteralPath $knownPath) {
         $chromaExecutable = $knownPath
     } else {

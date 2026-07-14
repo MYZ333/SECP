@@ -28,7 +28,7 @@
           :class="{ active: active?.session.id === item.session.id }"
           @click="select(item)"
         >
-          <el-avatar :size="42" :src="item.patient?.avatar">{{ patientInitial(item) }}</el-avatar>
+          <el-avatar :size="42" :src="resolveServerUrl(item.patient?.avatar)">{{ patientInitial(item) }}</el-avatar>
           <span class="session-copy">
             <span class="session-name"><b>{{ item.patient?.nickname || item.patient?.username || '患者' }}</b><time>{{ shortTime(item.session.lastMessageTime) }}</time></span>
             <span class="last-message">{{ item.session.lastMessage || '暂无消息' }}</span>
@@ -42,7 +42,7 @@
         <template v-if="active">
           <header class="chat-head">
             <div class="patient-head">
-              <el-avatar :size="44" :src="active.patient?.avatar">{{ patientInitial(active) }}</el-avatar>
+              <el-avatar :size="44" :src="resolveServerUrl(active.patient?.avatar)">{{ patientInitial(active) }}</el-avatar>
               <div><strong>{{ active.patient?.nickname || active.patient?.username }}</strong><p>{{ genderText(active.patient?.gender) }} · {{ isClosed(active) ? '会话已结束' : '实时医生咨询' }}</p></div>
             </div>
             <div class="head-actions">
@@ -55,11 +55,11 @@
           <div ref="messageBox" v-loading="loadingMessages" class="messages">
             <transition-group name="message">
               <div v-for="message in messages" :key="message.id" :class="['message-row', message.senderType === 'DOCTOR' ? 'mine' : 'theirs']">
-                <el-avatar v-if="message.senderType !== 'DOCTOR'" :size="34" :src="active.patient?.avatar">{{ patientInitial(active) }}</el-avatar>
+                <el-avatar v-if="message.senderType !== 'DOCTOR'" :size="34" :src="resolveServerUrl(active.patient?.avatar)">{{ patientInitial(active) }}</el-avatar>
                 <div class="message-wrap">
                   <div class="bubble">
                     <template v-if="message.messageType === 'ATTACHMENT'">
-                      <a :href="message.attachmentUrl" target="_blank" rel="noopener"><el-icon><Document /></el-icon>{{ message.attachmentName || '查看附件' }}</a>
+                      <a :href="resolveServerUrl(message.attachmentUrl)" target="_blank" rel="noopener"><el-icon><Document /></el-icon>{{ message.attachmentName || '查看附件' }}</a>
                       <p v-if="message.content">{{ message.content }}</p>
                     </template>
                     <template v-else>{{ message.content }}</template>
@@ -96,6 +96,7 @@ import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ChatDotRound, Document, Paperclip, Postcard, Promotion, Refresh } from '@element-plus/icons-vue'
 import { closeSession, doctorWsUrl, getSessionMessages, pageSessions, sendSessionMessage, uploadAttachment } from '@/api'
+import { resolveServerUrl } from '@/config/server'
 
 const sessions = ref([])
 const active = ref(null)

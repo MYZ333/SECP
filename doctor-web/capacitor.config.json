@@ -1,0 +1,11 @@
+{
+  "appId": "com.secp.hda.doctor",
+  "appName": "智慧医养医生端",
+  "webDir": "dist",
+  "server": {
+    "cleartext": true
+  },
+  "android": {
+    "allowMixedContent": true
+  }
+}

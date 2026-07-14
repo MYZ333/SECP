@@ -76,6 +76,10 @@ data/rag/documents/
 /PRODUCT.md
 /docs/
 
+android/
+apk-output/
+.vite/
+
 # ---------- Local planning and runtime uploads ----------
 /SECP/
 /backend/uploads/

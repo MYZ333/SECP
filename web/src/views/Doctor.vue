@@ -22,7 +22,7 @@
     <div class="grid">
       <div class="doc" v-for="(d, i) in list" :key="d.id" v-reveal="i % 3" @click="openDetail(d)">
         <div class="top">
-          <el-avatar :size="66" :src="d.avatar" class="ava">{{ d.name?.[0] }}</el-avatar>
+          <el-avatar :size="66" :src="resolveServerUrl(d.avatar)" class="ava">{{ d.name?.[0] }}</el-avatar>
           <div class="meta">
             <div class="name-row"><span class="name">{{ d.name }}</span><el-tag round effect="light">{{ d.title }}</el-tag></div>
             <div class="place">{{ d.hospital }} · {{ d.department }}</div>
@@ -47,7 +47,7 @@
     <el-drawer v-model="drawer" size="440px" :with-header="false" class="doc-drawer" append-to-body>
       <div v-if="current" class="detail">
         <div class="d-head">
-          <el-avatar :size="92" :src="current.avatar" class="d-ava">{{ current.name?.[0] }}</el-avatar>
+          <el-avatar :size="92" :src="resolveServerUrl(current.avatar)" class="d-ava">{{ current.name?.[0] }}</el-avatar>
           <h3>{{ current.name }}</h3>
           <p class="d-title">{{ current.title }}</p>
           <p class="d-place">{{ current.hospital }} · {{ current.department }}</p>
@@ -74,6 +74,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Search } from '@element-plus/icons-vue'
 import { pageDoctors, getDoctorDepartments } from '@/api'
+import { resolveServerUrl } from '@/config/server'
 
 const router = useRouter()
 const list = ref([]), total = ref(0)

@@ -1,5 +1,6 @@
 import request from './request'
 import { encryptPassword } from './crypto'
+import { apiUrl, createWebSocketUrl } from '@/config/server'
 
 // 认证（登录/注册/重置：密码经 RSA 加密后再提交）
 export const login = async (data) =>
@@ -78,7 +79,7 @@ export const adminImportApplicationKnowledgeSeeds = () => request.post('/admin/k
 
 // Axios 不直接消费浏览器 POST 响应流；AI 助手接口统一使用 fetch 解析 SSE。
 async function postSseStream (url, data, handlers, assistantName) {
-  const response = await fetch(url, {
+  const response = await fetch(apiUrl(url), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -136,11 +137,11 @@ async function postSseStream (url, data, handlers, assistantName) {
 }
 
 export function consultChatStream (data, handlers = {}) {
-  return postSseStream('/api/consult/chat/stream', data, handlers, '健康助手')
+  return postSseStream('/consult/chat/stream', data, handlers, '健康助手')
 }
 
 export function applicationAssistantChatStream (data, handlers = {}) {
-  return postSseStream('/api/app-assistant/chat/stream', data, handlers, '应用助手')
+  return postSseStream('/app-assistant/chat/stream', data, handlers, '应用助手')
 }
 export const startDoctorSession = (doctorId) => request.post(`/doctor-consult/session/${doctorId}`)
 export const pageDoctorConsultSessions = (params) => request.get('/doctor-consult/sessions', { params })
@@ -150,8 +151,7 @@ export const closeDoctorConsultSession = (sessionId) => request.put(`/doctor-con
 export const uploadConsultAttachment = (formData) => request.post('/file/consult-attachment', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
 export function doctorConsultWsUrl() {
   const token = localStorage.getItem('token') || ''
-  const protocol = location.protocol === 'https:' ? 'wss' : 'ws'
-  return `${protocol}://${location.host}/ws/doctor-consult?token=${encodeURIComponent(token)}`
+  return createWebSocketUrl('/ws/doctor-consult', { token })
 }
 export const pageAlerts = (params) => request.get('/alert/page', { params })
 export const generateAlert = () => request.post('/alert/generate')
