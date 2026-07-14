@@ -1,11 +1,14 @@
 package com.medcare.hda.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+
+import java.util.Map;
 
 /** 医生专家库 */
 @Data
@@ -49,4 +52,16 @@ public class Doctor extends BaseEntity {
 
     @Schema(description = "审核状态: PENDING / APPROVED / REJECTED")
     private String auditStatus;
+
+    @TableField(exist = false)
+    @Schema(description = "平均评分")
+    private Double averageRating;
+
+    @TableField(exist = false)
+    @Schema(description = "评分总数")
+    private Integer ratingCount;
+
+    @TableField(exist = false)
+    @Schema(description = "各星级评价数量，key 为 1-5")
+    private Map<Integer, Integer> ratingCounts;
 }

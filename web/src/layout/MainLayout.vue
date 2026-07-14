@@ -140,6 +140,7 @@ const navList = computed(() => {
       { key: 'adminHome', title: '系统管理', path: '/admin' },
       { key: 'adminUser', title: '用户管理', path: '/admin/user' },
       { key: 'adminProduct', title: '商品管理', path: '/admin/product' },
+      { key: 'adminMedicine', title: '药品库', path: '/admin/medicine' },
       { key: 'adminDoctor', title: '专家管理', path: '/admin/doctor' },
       { key: 'adminKnowledge', title: '智能体知识库', path: '/admin/knowledge' },
       { key: 'account', title: '账户管理', path: '/account' },
@@ -175,6 +176,7 @@ const navList = computed(() => {
       children: [
         { title: '用户管理', path: '/admin/user', desc: '平台用户与权限管理' },
         { title: '商品管理', path: '/admin/product', desc: '积分商城商品维护' },
+        { title: '药品库', path: '/admin/medicine', desc: '医生用药建议可选药品维护' },
         { title: '专家管理', path: '/admin/doctor', desc: '医生专家信息维护' },
         { title: '智能体知识库', path: '/admin/knowledge', desc: '健康助手与应用助手资料分库管理' },
       ],

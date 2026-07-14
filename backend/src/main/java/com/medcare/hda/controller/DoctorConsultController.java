@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.medcare.hda.common.PageResult;
 import com.medcare.hda.common.Result;
 import com.medcare.hda.common.ResultCode;
+import com.medcare.hda.dto.DoctorConsultFeedbackDTO;
 import com.medcare.hda.dto.DoctorConsultMessageDTO;
 import com.medcare.hda.dto.DoctorConsultSessionVO;
 import com.medcare.hda.entity.Doctor;
@@ -22,6 +23,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -50,6 +52,7 @@ public class DoctorConsultController {
         DoctorConsultSession session = sessionService.getOne(Wrappers.<DoctorConsultSession>lambdaQuery()
                 .eq(DoctorConsultSession::getUserId, userId)
                 .eq(DoctorConsultSession::getDoctorId, doctorId)
+                .eq(DoctorConsultSession::getStatus, "OPEN")
                 .orderByDesc(DoctorConsultSession::getLastMessageTime)
                 .orderByDesc(DoctorConsultSession::getId)
                 .last("LIMIT 1"));
@@ -62,13 +65,6 @@ public class DoctorConsultController {
             session.setUnreadUser(0);
             session.setLastMessageTime(LocalDateTime.now());
             sessionService.save(session);
-        } else if (!"OPEN".equals(session.getStatus())) {
-            session.setStatus("OPEN");
-            session.setLastMessage("会话已重新开启");
-            session.setLastMessageTime(LocalDateTime.now());
-            session.setUnreadDoctor(0);
-            session.setUnreadUser(0);
-            sessionService.updateById(session);
         }
         return Result.success(toVO(session));
     }
@@ -127,6 +123,33 @@ public class DoctorConsultController {
         return Result.success("会话已结束", toVO(session));
     }
 
+    @Operation(summary = "患者提交咨询反馈")
+    @PostMapping("/session/{sessionId}/feedback")
+    public Result<DoctorConsultSessionVO> feedback(@PathVariable Long sessionId,
+                                                   @Valid @RequestBody DoctorConsultFeedbackDTO dto) {
+        DoctorConsultSession session = checkPatientSession(sessionId);
+        if (!"CLOSED".equals(session.getStatus())) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "会话结束后才能评价");
+        }
+        if (!hasDoctorSummary(session)) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "医生提交咨询报告后才能评价");
+        }
+        if (dto.getRating() == null) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "请选择评分");
+        }
+        session.setRating(dto.getRating());
+        session.setFeedbackTags(joinTags(dto.getTags()));
+        session.setFeedback(cleanText(dto.getFeedback()));
+        session.setFeedbackTime(LocalDateTime.now());
+        sessionService.updateById(session);
+
+        Doctor doctor = doctorService.getById(session.getDoctorId());
+        if (doctor != null && doctor.getUserId() != null) {
+            notifier.notifyUser(doctor.getUserId(), "DOCTOR_CONSULT_FEEDBACK", session);
+        }
+        return Result.success("评价已提交", toVO(session));
+    }
+
     private DoctorConsultSession checkPatientSession(Long sessionId) {
         DoctorConsultSession session = sessionService.getById(sessionId);
         if (session == null || !session.getUserId().equals(SecurityUtil.getUserId())) {
@@ -151,6 +174,29 @@ public class DoctorConsultController {
         session.setUnreadDoctor(0);
         session.setUnreadUser(0);
         sessionService.updateById(session);
+    }
+
+    private String joinTags(List<String> tags) {
+        if (tags == null || tags.isEmpty()) return null;
+        String value = String.join(",", tags.stream()
+                .filter(StringUtils::hasText)
+                .map(String::trim)
+                .distinct()
+                .limit(8)
+                .toList());
+        return StringUtils.hasText(value) ? value : null;
+    }
+
+    private String cleanText(String value) {
+        return StringUtils.hasText(value) ? value.trim() : null;
+    }
+
+    private boolean hasDoctorSummary(DoctorConsultSession session) {
+        return StringUtils.hasText(session.getProblemOverview())
+                || StringUtils.hasText(session.getPreliminaryAssessment())
+                || StringUtils.hasText(session.getSummary())
+                || StringUtils.hasText(session.getAdvice())
+                || StringUtils.hasText(session.getRiskWarning());
     }
 
     private DoctorConsultMessage newMessage(DoctorConsultSession session, String senderType, DoctorConsultMessageDTO dto) {

@@ -154,6 +154,9 @@ export const pageDoctorConsultSessions = (params) => request.get('/doctor-consul
 export const getDoctorConsultMessages = (sessionId) => request.get(`/doctor-consult/session/${sessionId}/messages`)
 export const sendDoctorConsultMessage = (sessionId, data) => request.post(`/doctor-consult/session/${sessionId}/messages`, data)
 export const closeDoctorConsultSession = (sessionId) => request.put(`/doctor-consult/session/${sessionId}/close`)
+export const submitDoctorConsultFeedback = (sessionId, data) => request.post(`/doctor-consult/session/${sessionId}/feedback`, data)
+export const getPatientMedicationAdvice = (sessionId) => request.get(`/doctor-consult/session/${sessionId}/medication-advice`)
+export const confirmMedicationAdvice = (adviceId) => request.put(`/doctor-consult/medication-advice/${adviceId}/confirm`)
 export const uploadConsultAttachment = (formData) => request.post('/file/consult-attachment', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
 export function doctorConsultWsUrl() {
   const token = localStorage.getItem('token') || ''
@@ -171,6 +174,10 @@ export const adminPageProducts = (params) => request.get('/admin/product/page', 
 export const adminCreateProduct = (data) => request.post('/admin/product', data)
 export const adminUpdateProduct = (data) => request.put('/admin/product', data)
 export const adminDeleteProduct = (id) => request.delete(`/admin/product/${id}`)
+export const adminPageMedicines = (params) => request.get('/admin/medicine/page', { params })
+export const adminCreateMedicine = (data) => request.post('/admin/medicine', data)
+export const adminUpdateMedicine = (data) => request.put('/admin/medicine', data)
+export const adminDeleteMedicine = (id) => request.delete(`/admin/medicine/${id}`)
 export const adminPageDoctors = (params) => request.get('/admin/doctor/page', { params })
 export const adminCreateDoctor = (data) => request.post('/admin/doctor', data)
 export const adminUpdateDoctor = (data) => request.put('/admin/doctor', data)

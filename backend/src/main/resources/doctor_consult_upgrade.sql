@@ -46,6 +46,19 @@ CREATE TABLE IF NOT EXISTS doctor_consult_message (
     KEY idx_doctor_time (doctor_id, create_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='医生咨询消息';
 
+-- 咨询结束反馈闭环字段：医生填写总结，患者提交评价。
+ALTER TABLE doctor_consult_session
+    ADD COLUMN problem_overview TEXT DEFAULT NULL COMMENT '本次咨询问题概述' AFTER unread_doctor,
+    ADD COLUMN preliminary_assessment TEXT DEFAULT NULL COMMENT '医生初步判断' AFTER problem_overview,
+    ADD COLUMN summary TEXT DEFAULT NULL COMMENT '本次咨询总结' AFTER preliminary_assessment,
+    ADD COLUMN advice TEXT DEFAULT NULL COMMENT '后续建议' AFTER summary,
+    ADD COLUMN risk_warning TEXT DEFAULT NULL COMMENT '风险提醒' AFTER advice,
+    ADD COLUMN recommend_offline TINYINT NOT NULL DEFAULT 0 COMMENT '是否建议线下就医' AFTER risk_warning,
+    ADD COLUMN rating TINYINT DEFAULT NULL COMMENT '患者评分1-5' AFTER recommend_offline,
+    ADD COLUMN feedback_tags VARCHAR(255) DEFAULT NULL COMMENT '患者评价标签' AFTER rating,
+    ADD COLUMN feedback VARCHAR(500) DEFAULT NULL COMMENT '患者文字评价' AFTER feedback_tags,
+    ADD COLUMN feedback_time DATETIME DEFAULT NULL COMMENT '患者评价时间' AFTER feedback;
+
 -- 按医生记录顺序分配 doctor1、doctor2 ... 登录账号，密码均为 123456。
 -- ON DUPLICATE KEY UPDATE 让账号部分可重复执行，并覆盖全部现有医生。
 INSERT INTO sys_user (username, password, nickname, status, create_time, update_time, deleted)
