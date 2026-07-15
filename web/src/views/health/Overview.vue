@@ -106,6 +106,7 @@ const modules = [
   { title: '体征数据', desc: '记录血压、血糖、心率、体温等日常指标。', path: '/health/metric', icon: DataLine },
   { title: '就诊记录', desc: '保存医院、科室、诊断与处方用药信息。', path: '/health/medical', icon: Tickets },
   { title: '健康报告', desc: '查看周期性健康分析和系统生成报告。', path: '/health/report', icon: Document },
+  { title: '健康时间轴', desc: '把体征、预警、咨询和用药建议串成连续健康轨迹。', path: '/health/timeline', icon: DataLine },
 ]
 
 const completeness = computed(() => {

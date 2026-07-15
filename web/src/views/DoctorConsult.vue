@@ -1,162 +1,164 @@
 <template>
-  <el-card class="chat-card">
-    <aside class="sessions">
-      <div class="side-head">
-        <div class="side-title">
-          <strong>医生咨询</strong>
-          <el-button class="history-trigger" text type="primary" @click="openHistoryDialog">历史对话</el-button>
+  <div class="doctor-consult-page">
+    <el-card class="chat-card">
+      <aside class="sessions">
+        <div class="side-head">
+          <div class="side-title">
+            <strong>医生咨询</strong>
+            <el-button class="history-trigger" text type="primary" @click="openHistoryDialog">历史对话</el-button>
+          </div>
+          <span class="muted">选择医生后开始实时对话</span>
         </div>
-        <span class="muted">选择医生后开始实时对话</span>
-      </div>
-      <button v-for="item in sessions" :key="item.session.id" :class="{ on: active?.session.id === item.session.id }" @click="select(item)">
-        <b>{{ item.doctor?.name || '医生' }}</b>
-        <span>{{ item.session.lastMessage || `${item.doctor?.department || ''} · ${item.doctor?.title || ''}` }}</span>
-        <em v-if="item.session.unreadUser">{{ item.session.unreadUser }}</em>
-      </button>
-      <div v-if="!sessions.length" class="session-empty">
-        <p>暂无进行中的咨询</p>
-      </div>
-    </aside>
+        <button v-for="item in sessions" :key="item.session.id" :class="{ on: active?.session.id === item.session.id }" @click="select(item)">
+          <b>{{ item.doctor?.name || '医生' }}</b>
+          <span>{{ item.session.lastMessage || `${item.doctor?.department || ''} · ${item.doctor?.title || ''}` }}</span>
+          <em v-if="item.session.unreadUser">{{ item.session.unreadUser }}</em>
+        </button>
+        <div v-if="!sessions.length" class="session-empty">
+          <p>暂无进行中的咨询</p>
+        </div>
+      </aside>
 
-    <section class="chat">
-      <template v-if="active">
-        <header class="chat-head">
-          <div class="doc">
-            <el-avatar :size="46" :src="resolveServerUrl(active.doctor?.avatar)">{{ active.doctor?.name?.charAt(0) || '医' }}</el-avatar>
-            <div>
-              <div class="doc-name">{{ active.doctor?.name }}</div>
-              <div class="doc-sub">{{ active.doctor?.hospital }} · {{ active.doctor?.department }} · {{ isClosed(active) ? '会话已结束' : '实时咨询' }}</div>
-            </div>
-          </div>
-          <div class="head-actions">
-            <el-tag :type="isClosed(active) ? 'info' : 'success'">{{ isClosed(active) ? '已结束' : '实时咨询' }}</el-tag>
-            <el-button v-if="!isClosed(active)" plain type="danger" @click="closeActiveSession">结束咨询</el-button>
-          </div>
-        </header>
-        <div class="messages" ref="msgBox">
-          <div v-for="m in messages" :key="m.id" :class="['msg', m.senderType === 'USER' ? 'user' : 'doctor']">
-            <div v-if="m.senderType === 'DOCTOR'" class="face"><el-icon><Avatar /></el-icon></div>
-            <div class="bubble">
-              <template v-if="m.messageType === 'ATTACHMENT'">
-                <a :href="resolveServerUrl(m.attachmentUrl)" target="_blank">{{ m.attachmentName || '查看附件' }}</a>
-                <p v-if="m.content">{{ m.content }}</p>
-              </template>
-              <template v-else>{{ m.content }}</template>
-            </div>
-          </div>
-          <div v-if="isClosed(active) && !hasDoctorSummary(active)" class="result-panel waiting-summary">
-            <div class="result-head">
-              <strong>等待医生报告</strong>
-              <el-tag type="info">已结束</el-tag>
-            </div>
-            <p>咨询已结束，医生正在整理本次咨询报告。报告完成后，这里会显示咨询结果并开放评价。</p>
-          </div>
-          <div v-else-if="isClosed(active)" class="result-panel">
-            <div class="result-head">
-              <strong>咨询报告</strong>
-              <el-tag :type="active.session.recommendOffline ? 'warning' : 'success'">
-                {{ active.session.recommendOffline ? '建议线下就医' : '居家观察' }}
-              </el-tag>
-            </div>
-            <div class="result-grid">
-              <section>
-                <span>问题概述</span>
-                <p>{{ active.session.problemOverview || '医生暂未填写问题概述。' }}</p>
-              </section>
-              <section>
-                <span>初步判断</span>
-                <p>{{ active.session.preliminaryAssessment || '医生暂未填写初步判断。' }}</p>
-              </section>
-              <section>
-                <span>本次总结</span>
-                <p>{{ active.session.summary || '医生暂未填写本次咨询总结。' }}</p>
-              </section>
-              <section>
-                <span>处理建议</span>
-                <p>{{ active.session.advice || '暂无后续建议。' }}</p>
-              </section>
-              <section class="risk-section">
-                <span>风险提醒</span>
-                <p>{{ active.session.riskWarning || '暂无特别风险提醒。' }}</p>
-              </section>
-            </div>
-            <div v-if="active.session.rating" class="feedback-done">
-              <el-rate :model-value="active.session.rating" disabled />
-              <span>已评价</span>
-              <p v-if="active.session.feedback">{{ active.session.feedback }}</p>
-            </div>
-            <div v-else class="feedback-form">
-              <div class="feedback-top">
-                <span>本次服务评价</span>
-                <el-rate v-model="rating" />
+      <section class="chat">
+        <template v-if="active">
+          <header class="chat-head">
+            <div class="doc">
+              <el-avatar :size="46" :src="resolveServerUrl(active.doctor?.avatar)">{{ active.doctor?.name?.charAt(0) || '医' }}</el-avatar>
+              <div>
+                <div class="doc-name">{{ active.doctor?.name }}</div>
+                <div class="doc-sub">{{ active.doctor?.hospital }} · {{ active.doctor?.department }} · {{ isClosed(active) ? '会话已结束' : '实时咨询' }}</div>
               </div>
-              <el-checkbox-group v-model="feedbackTags" class="tag-group">
-                <el-checkbox-button v-for="tag in feedbackTagOptions" :key="tag" :label="tag">{{ tag }}</el-checkbox-button>
-              </el-checkbox-group>
-              <el-input v-model="feedbackText" type="textarea" :rows="2" maxlength="500" show-word-limit placeholder="也可以补充说明本次咨询体验" />
-              <el-button type="primary" :loading="submittingFeedback" @click="submitFeedback">提交评价</el-button>
             </div>
-            <div v-if="medicationAdvice" class="medication-panel">
-              <div class="medication-head">
-                <span>用药建议</span>
-                <el-tag :type="medicationAdvice.status === 'CONFIRMED' ? 'success' : 'warning'">
-                  {{ medicationAdvice.status === 'CONFIRMED' ? '已确认' : '待确认' }}
+            <div class="head-actions">
+              <el-tag :type="isClosed(active) ? 'info' : 'success'">{{ isClosed(active) ? '已结束' : '实时咨询' }}</el-tag>
+              <el-button v-if="!isClosed(active)" plain type="danger" @click="closeActiveSession">结束咨询</el-button>
+            </div>
+          </header>
+          <div class="messages" ref="msgBox">
+            <div v-for="m in messages" :key="m.id" :class="['msg', m.senderType === 'USER' ? 'user' : 'doctor']">
+              <div v-if="m.senderType === 'DOCTOR'" class="face"><el-icon><Avatar /></el-icon></div>
+              <div class="bubble">
+                <template v-if="m.messageType === 'ATTACHMENT'">
+                  <a :href="resolveServerUrl(m.attachmentUrl)" target="_blank">{{ m.attachmentName || '查看附件' }}</a>
+                  <p v-if="m.content">{{ m.content }}</p>
+                </template>
+                <template v-else>{{ m.content }}</template>
+              </div>
+            </div>
+            <div v-if="isClosed(active) && !hasDoctorSummary(active)" class="result-panel waiting-summary">
+              <div class="result-head">
+                <strong>等待医生报告</strong>
+                <el-tag type="info">已结束</el-tag>
+              </div>
+              <p>咨询已结束，医生正在整理本次咨询报告。报告完成后，这里会显示咨询结果并开放评价。</p>
+            </div>
+            <div v-else-if="isClosed(active)" class="result-panel">
+              <div class="result-head">
+                <strong>咨询报告</strong>
+                <el-tag :type="active.session.recommendOffline ? 'warning' : 'success'">
+                  {{ active.session.recommendOffline ? '建议线下就医' : '居家观察' }}
                 </el-tag>
               </div>
-              <p v-if="medicationAdvice.doctorNote" class="doctor-note">{{ medicationAdvice.doctorNote }}</p>
-              <div class="medicine-list">
-                <section v-for="item in medicationAdvice.items || []" :key="item.id || item.medicineId">
-                  <b>{{ item.medicineName }}</b>
-                  <small>{{ item.specification }}</small>
-                  <p>{{ item.usageMethod || '用法未填' }} · {{ item.dosage }} · {{ item.frequency }} · {{ item.durationDays }}天</p>
-                  <em v-if="item.precautions">{{ item.precautions }}</em>
+              <div class="result-grid">
+                <section>
+                  <span>问题概述</span>
+                  <p>{{ active.session.problemOverview || '医生暂未填写问题概述。' }}</p>
+                </section>
+                <section>
+                  <span>初步判断</span>
+                  <p>{{ active.session.preliminaryAssessment || '医生暂未填写初步判断。' }}</p>
+                </section>
+                <section>
+                  <span>本次总结</span>
+                  <p>{{ active.session.summary || '医生暂未填写本次咨询总结。' }}</p>
+                </section>
+                <section>
+                  <span>处理建议</span>
+                  <p>{{ active.session.advice || '暂无后续建议。' }}</p>
+                </section>
+                <section class="risk-section">
+                  <span>风险提醒</span>
+                  <p>{{ active.session.riskWarning || '暂无特别风险提醒。' }}</p>
                 </section>
               </div>
-              <el-button v-if="medicationAdvice.status !== 'CONFIRMED'" class="confirm-advice" type="primary" :loading="confirmingMedication" @click="confirmAdvice">
-                我已知晓
-              </el-button>
+              <div v-if="active.session.rating" class="feedback-done">
+                <el-rate :model-value="active.session.rating" disabled />
+                <span>已评价</span>
+                <p v-if="active.session.feedback">{{ active.session.feedback }}</p>
+              </div>
+              <div v-else class="feedback-form">
+                <div class="feedback-top">
+                  <span>本次服务评价</span>
+                  <el-rate v-model="rating" />
+                </div>
+                <el-checkbox-group v-model="feedbackTags" class="tag-group">
+                  <el-checkbox-button v-for="tag in feedbackTagOptions" :key="tag" :label="tag">{{ tag }}</el-checkbox-button>
+                </el-checkbox-group>
+                <el-input v-model="feedbackText" type="textarea" :rows="2" maxlength="500" show-word-limit placeholder="也可以补充说明本次咨询体验" />
+                <el-button type="primary" :loading="submittingFeedback" @click="submitFeedback">提交评价</el-button>
+              </div>
+              <div v-if="medicationAdvice" class="medication-panel">
+                <div class="medication-head">
+                  <span>用药建议</span>
+                  <el-tag :type="medicationAdvice.status === 'CONFIRMED' ? 'success' : 'warning'">
+                    {{ medicationAdvice.status === 'CONFIRMED' ? '已确认' : '待确认' }}
+                  </el-tag>
+                </div>
+                <p v-if="medicationAdvice.doctorNote" class="doctor-note">{{ medicationAdvice.doctorNote }}</p>
+                <div class="medicine-list">
+                  <section v-for="item in medicationAdvice.items || []" :key="item.id || item.medicineId">
+                    <b>{{ item.medicineName }}</b>
+                    <small>{{ item.specification }}</small>
+                    <p>{{ item.usageMethod || '用法未填' }} · {{ item.dosage }} · {{ item.frequency }} · {{ item.durationDays }}天</p>
+                    <em v-if="item.precautions">{{ item.precautions }}</em>
+                  </section>
+                </div>
+                <el-button v-if="medicationAdvice.status !== 'CONFIRMED'" class="confirm-advice" type="primary" :loading="confirmingMedication" @click="confirmAdvice">
+                  我已知晓
+                </el-button>
+              </div>
             </div>
           </div>
+          <footer class="input-row">
+            <el-upload :show-file-list="false" :http-request="doUpload">
+              <el-button :disabled="isClosed(active)" :loading="uploading">附件</el-button>
+            </el-upload>
+            <el-input v-model="text" size="large" :disabled="isClosed(active)" :placeholder="isClosed(active) ? '会话已结束，不能继续发送消息' : '请输入想咨询医生的问题…'" @keyup.enter="send" />
+            <el-button type="primary" size="large" :disabled="isClosed(active) || !text.trim()" @click="send">
+              <el-icon><Promotion /></el-icon>&nbsp;发送
+            </el-button>
+          </footer>
+        </template>
+        <div v-else class="hello">
+          <div class="hello-orb"><el-icon :size="40"><ChatDotRound /></el-icon></div>
+          <h3>请选择医生开始咨询</h3>
+          <el-button type="primary" @click="$router.push('/doctor')">前往医生专家库</el-button>
         </div>
-        <footer class="input-row">
-          <el-upload :show-file-list="false" :http-request="doUpload">
-            <el-button :disabled="isClosed(active)" :loading="uploading">附件</el-button>
-          </el-upload>
-          <el-input v-model="text" size="large" :disabled="isClosed(active)" :placeholder="isClosed(active) ? '会话已结束，不能继续发送消息' : '请输入想咨询医生的问题…'" @keyup.enter="send" />
-          <el-button type="primary" size="large" :disabled="isClosed(active) || !text.trim()" @click="send">
-            <el-icon><Promotion /></el-icon>&nbsp;发送
-          </el-button>
-        </footer>
-      </template>
-      <div v-else class="hello">
-        <div class="hello-orb"><el-icon :size="40"><ChatDotRound /></el-icon></div>
-        <h3>请选择医生开始咨询</h3>
-        <el-button type="primary" @click="$router.push('/doctor')">前往医生专家库</el-button>
-      </div>
-    </section>
-  </el-card>
+      </section>
+    </el-card>
 
-  <el-dialog v-model="historyDialogVisible" title="历史对话" width="620px" class="history-dialog">
-    <div v-if="historySessions.length" class="history-list">
-      <button v-for="item in historySessions" :key="item.session.id" type="button" :class="{ on: active?.session.id === item.session.id }" @click="selectHistory(item)">
-        <span class="history-main">
-          <b>{{ item.doctor?.name || '医生' }}</b>
-          <small>{{ formatTime(item.session.lastMessageTime || item.session.updateTime || item.session.createTime) }}</small>
-        </span>
-        <span class="history-sub">{{ item.session.problemOverview || item.session.summary || item.session.advice || item.session.lastMessage || '已结束咨询' }}</span>
-        <span class="history-meta">
-          <el-tag size="small" type="info">已结束</el-tag>
-          <el-rate v-if="item.session.rating" :model-value="item.session.rating" disabled size="small" />
-          <em v-else>未评价</em>
-        </span>
-      </button>
-    </div>
-    <el-empty v-else description="暂无历史对话" :image-size="78" />
-  </el-dialog>
+    <el-dialog v-model="historyDialogVisible" title="历史对话" width="620px" class="history-dialog">
+      <div v-if="historySessions.length" class="history-list">
+        <button v-for="item in historySessions" :key="item.session.id" type="button" :class="{ on: active?.session.id === item.session.id }" @click="selectHistory(item)">
+          <span class="history-main">
+            <b>{{ item.doctor?.name || '医生' }}</b>
+            <small>{{ formatTime(item.session.lastMessageTime || item.session.updateTime || item.session.createTime) }}</small>
+          </span>
+          <span class="history-sub">{{ item.session.problemOverview || item.session.summary || item.session.advice || item.session.lastMessage || '已结束咨询' }}</span>
+          <span class="history-meta">
+            <el-tag size="small" type="info">已结束</el-tag>
+            <el-rate v-if="item.session.rating" :model-value="item.session.rating" disabled size="small" />
+            <em v-else>未评价</em>
+          </span>
+        </button>
+      </div>
+      <el-empty v-else description="暂无历史对话" :image-size="78" />
+    </el-dialog>
+  </div>
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Avatar, ChatDotRound, Promotion } from '@element-plus/icons-vue'
@@ -211,6 +213,18 @@ async function ensureSessionFromDoctor() {
   await loadSessions()
   const found = allSessions.value.find(s => s.session.id === res.data.session.id)
   if (found) await select(found)
+}
+
+async function ensureSessionFromRoute() {
+  const sessionId = Number(route.query.sessionId)
+  if (!sessionId) return false
+  const found = allSessions.value.find(item => Number(item.session.id) === sessionId)
+  if (!found) {
+    ElMessage.warning('未找到该历史咨询')
+    return false
+  }
+  await select(found)
+  return true
 }
 
 async function select(item) {
@@ -394,9 +408,15 @@ function formatTime(value) { return value ? String(value).slice(0, 16).replace('
 onMounted(async () => {
   closing = false
   await loadSessions()
-  await ensureSessionFromDoctor()
+  const selectedFromRoute = await ensureSessionFromRoute()
+  if (!selectedFromRoute) await ensureSessionFromDoctor()
   if (!active.value && sessions.value.length) await select(sessions.value[0])
   connectWs()
+})
+
+watch(() => route.query.sessionId, async (sessionId) => {
+  if (!sessionId || !allSessions.value.length) return
+  await ensureSessionFromRoute()
 })
 onBeforeUnmount(() => {
   closing = true
@@ -406,6 +426,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.doctor-consult-page { min-height: calc(100dvh - 120px); }
 .chat-card { height: calc(100dvh - 120px); overflow: hidden; }
 .chat-card :deep(.el-card__body) { height: 100%; min-height: 0; display: grid; grid-template-columns: 320px 1fr; padding: 0; }
 .sessions { min-height: 0; border-right: 1px solid var(--hda-line); overflow-y: auto; overscroll-behavior: contain; }

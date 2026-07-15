@@ -69,7 +69,7 @@
 }
 
 /* —— 全局基底 —— */
-html, body, #app { height: 100%; }
+html, body, #app { height: 100%; max-width: 100%; overflow-x: hidden; }
 body {
   margin: 0;
   background: var(--hda-bg);
@@ -82,6 +82,7 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   scroll-behavior: smooth;
+  overflow-x: hidden;
 }
 * { box-sizing: border-box; }
 ::selection { background: var(--el-color-primary-light-7); color: var(--hda-ink); }

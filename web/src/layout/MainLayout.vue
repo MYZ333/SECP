@@ -155,6 +155,7 @@ const navList = computed(() => {
         { title: '体征数据', path: '/health/metric', desc: '血压、血糖等日常记录' },
         { title: '就诊记录', path: '/health/medical', desc: '历次就诊与用药信息' },
         { title: '健康报告', path: '/health/report', desc: '周期性健康分析报告' },
+        { title: '健康时间轴', path: '/health/timeline', desc: '串联体征、预警、咨询与用药闭环' },
       ],
     },
     {
@@ -329,7 +330,7 @@ async function onCommand(cmd) {
 .drop-enter-from, .drop-leave-to { opacity: 0; transform: scaleY(.6); }
 
 /* ============ 内容区 ============ */
-.page-main { flex: 1; position: relative; z-index: 1; padding: 28px; }
+.page-main { flex: 1; position: relative; z-index: 1; max-width: 100%; overflow-x: clip; padding: 28px; }
 </style>
 
 <style>

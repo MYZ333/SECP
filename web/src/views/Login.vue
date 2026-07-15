@@ -118,7 +118,11 @@
             <el-form-item><el-input v-model="regForm.username" placeholder="用户名（3-20位）" /></el-form-item>
             <el-form-item><el-input v-model="regForm.password" type="password" show-password placeholder="密码（6-32位）" /></el-form-item>
             <el-form-item><el-input v-model="regForm.nickname" placeholder="昵称（可选）" /></el-form-item>
-            <el-form-item><el-input v-model="regForm.phone" placeholder="手机号（可选）" /></el-form-item>
+            <el-form-item>
+              <el-input v-model="regForm.phone" placeholder="手机号（必填）" maxlength="11">
+                <template #prepend>+86</template>
+              </el-input>
+            </el-form-item>
             <el-button type="primary" class="submit" :loading="loading" @click="doRegister">立即注册</el-button>
           </el-form>
         </template>
@@ -262,7 +266,10 @@ async function doReset() {
 }
 
 async function doRegister() {
+  if (!regForm.value.username || regForm.value.username.length < 3 || regForm.value.username.length > 20)
+    return ElMessage.warning('用户名长度为3-20位')
   if (regForm.value.password.length < 6 || regForm.value.password.length > 32) return ElMessage.warning('密码长度为6-32位')
+  if (!/^1\d{10}$/.test(regForm.value.phone)) return ElMessage.warning('请输入正确的手机号')
   loading.value = true
   try {
     await register(regForm.value)

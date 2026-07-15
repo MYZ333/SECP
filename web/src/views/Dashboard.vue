@@ -49,6 +49,53 @@
         </div>
       </section>
 
+      <!-- ============ 健康态势球 ============ -->
+      <section class="situation glass" ref="situationEl" :class="healthSituation.tone">
+        <div class="sphere-wrap" aria-hidden="true">
+          <div class="sphere">
+            <span class="orbit o1"></span>
+            <span class="orbit o2"></span>
+            <span class="orbit o3"></span>
+            <span class="pulse-dot d1" :style="{ opacity: 0.38 + healthSituation.rings.metric * 0.62 }"></span>
+            <span class="pulse-dot d2" :style="{ opacity: 0.28 + healthSituation.rings.alert * 0.72 }"></span>
+            <span class="pulse-dot d3" :style="{ opacity: 0.28 + healthSituation.rings.consult * 0.72 }"></span>
+            <span class="pulse-dot d4" :style="{ opacity: 0.28 + healthSituation.rings.medicine * 0.72 }"></span>
+            <div class="sphere-core">
+              <strong>{{ situationLoading ? '--' : healthSituation.score }}</strong>
+              <small>{{ healthSituation.level }}</small>
+            </div>
+          </div>
+        </div>
+        <div class="situation-copy">
+          <p class="sec-kicker">HEALTH SITUATION</p>
+          <h3>健康态势球</h3>
+          <p class="situation-summary">{{ healthSituation.summary }}</p>
+          <div class="deductions">
+            <span v-if="!healthSituation.deductions.length">暂无明显扣分项，继续保持记录习惯。</span>
+            <span v-for="item in healthSituation.deductions.slice(0, 3)" :key="item.key">
+              {{ item.label }} <b>-{{ item.points }}</b>
+            </span>
+          </div>
+          <div class="situation-actions">
+            <button class="btn-main" @click="go('/health/timeline')">查看健康时间轴</button>
+            <button class="btn-ghost" @click="go('/alert')">处理预警</button>
+          </div>
+        </div>
+        <div class="mini-events">
+          <button
+            v-for="event in healthSituation.events.slice(0, 3)"
+            :key="event.id"
+            type="button"
+            class="mini-event"
+            @click="go(event.actionPath)"
+          >
+            <span>{{ typeMeta(event.type).label }}</span>
+            <b>{{ event.title }}</b>
+            <small>{{ formatTimelineTime(event.time) }}</small>
+          </button>
+        </div>
+      </section>
+
       <!-- ============ 统计卡片区 ============ -->
       <section class="stats" ref="statsEl">
         <div v-for="s in stats" :key="s.label" class="stat glass" role="button" tabindex="0"
@@ -97,6 +144,7 @@ import { CustomEase } from 'gsap/CustomEase'
 import ParticleNet from '@/components/ParticleNet.vue'
 import { getPointBalance, pageMetric, pageReport, pageAlerts, pagePointRecords } from '@/api'
 import { useUserStore } from '@/store/user'
+import { emptyHealthSituation, formatTimelineTime, loadHealthSituation, typeMeta } from '@/utils/healthSituation'
 
 gsap.registerPlugin(ScrollTrigger, CustomEase)
 CustomEase.create('hda', 'M0,0 C0.22,1 0.36,1 1,1') // cubic-bezier(0.22,1,0.36,1)
@@ -131,6 +179,8 @@ const titleChars = '祝您健康每一天'.split('')
 
 const raw = reactive({ balance: 0, metric: 0, report: 0, alert: 0 })
 const week = reactive({ balance: [0,0,0,0,0,0,0], metric: [0,0,0,0,0,0,0], report: [0,0,0,0,0,0,0], alert: [0,0,0,0,0,0,0] })
+const situationLoading = ref(true)
+const healthSituation = ref(emptyHealthSituation())
 
 /* 近 7 日（含今日）日期串 yyyy-MM-dd */
 const days = [...Array(7)].map((_, i) => {
@@ -155,6 +205,8 @@ const stats = computed(() => [
 const quicks = computed(() => [
   { name: '健康档案', path: '/health/profile', icon: ICONS.book,    color: '#2E6FE0', span: 'c2', anim: 'a-book',
     desc: '基本信息、既往病史与健康标签集中归档' },
+  { name: '健康时间轴', path: '/health/timeline', icon: ICONS.activity, color: '#37B6D9', span: 'c1', anim: 'a-line',
+    desc: '按时间串联体征、预警、报告和咨询闭环' },
   { name: '体征数据', path: '/health/metric',  icon: ICONS.activity, color: '#2E6FE0', span: 'c1', anim: 'a-line',
     desc: `已记录 ${raw.metric} 条，近 7 日新增 ${sum(week.metric)} 条` },
   { name: '积分商城', path: '/point/mall',     icon: ICONS.gift,    color: '#FF6A00', span: 'c1', anim: '',
@@ -170,7 +222,7 @@ const quicks = computed(() => [
 function go(p) { router.push(p) }
 
 /* ---------- refs ---------- */
-const root = ref(null), heroEl = ref(null), statsEl = ref(null), bentoEl = ref(null)
+const root = ref(null), heroEl = ref(null), situationEl = ref(null), statsEl = ref(null), bentoEl = ref(null)
 const b1 = ref(null), b2 = ref(null), progBar = ref(null)
 const ecgGroup = ref(null), ecgPath = ref(null)
 const sparkEls = reactive({})
@@ -236,6 +288,15 @@ async function fetchData() {
   if (pt.status === 'fulfilled')  week.balance = bucket(pt.value.data.records)
 }
 
+async function fetchSituation() {
+  situationLoading.value = true
+  try {
+    healthSituation.value = await loadHealthSituation({ metricSize: 80, sessionSize: 30, medicationLimit: 0 })
+  } finally {
+    situationLoading.value = false
+  }
+}
+
 /* ---------- GSAP 编排 ---------- */
 let ctx = null
 function initFx() {
@@ -243,12 +304,6 @@ function initFx() {
     /* Hero：问候语逐字 + 附属元素 */
     gsap.from('.hero .ch', { y: 16, opacity: 0, duration: 0.5, ease: 'hda', stagger: 0.03 })
     gsap.from('[data-hero]', { y: 20, opacity: 0, duration: 0.5, ease: 'hda', stagger: 0.08, delay: 0.35, clearProps: 'all' })
-
-    /* Hero 视差退场：轻微上移 + 淡出 */
-    gsap.to(heroEl.value, {
-      y: -60, opacity: 0.25, ease: 'none',
-      scrollTrigger: { trigger: heroEl.value, start: 'top 72px', end: 'bottom 72px', scrub: true },
-    })
 
     /* 光斑视差（系数 0.2），呼吸缩放由 CSS 负责（分离 transform 层避免冲突） */
     const max = () => ScrollTrigger.maxScroll(window)
@@ -260,26 +315,12 @@ function initFx() {
     gsap.set(p, { strokeDasharray: `${len * 0.22} ${len}`, strokeDashoffset: len * 1.22 })
     gsap.to(p, { strokeDashoffset: -len * 0.22, duration: 6, repeat: -1, ease: 'none' })
 
-    /* 统计卡翻入：rotateX -15deg → 0，只播一次 */
-    gsap.from('.stat', {
-      rotateX: -15, y: 24, opacity: 0, transformOrigin: '50% 100%',
-      duration: 0.55, ease: 'hda', stagger: 0.1, clearProps: 'transform,opacity',
-      scrollTrigger: { trigger: statsEl.value, start: 'top 88%', once: true },
-    })
-
-    /* bento：从下方 40px 依次浮现，只播一次 */
-    gsap.from('.quick .sec-title', {
-      y: 24, opacity: 0, duration: 0.5, ease: 'hda', clearProps: 'all',
-      scrollTrigger: { trigger: bentoEl.value, start: 'top 90%', once: true },
-    })
-    gsap.from('.tile', {
-      y: 40, opacity: 0, duration: 0.5, ease: 'hda', stagger: 0.08, clearProps: 'all',
-      scrollTrigger: { trigger: bentoEl.value, start: 'top 85%', once: true },
-    })
+    /* 主要内容默认保持可见，只保留 hover、描边、图表线条这类不控制显隐的动效。 */
   }, root.value)
 }
 
 /* sparkline 生长绘制（数据就绪后再挂 ScrollTrigger，只播一次） */
+let sparkTweens = []
 function drawSparks() {
   const paths = Object.values(sparkEls).filter(Boolean)
   if (!paths.length) return
@@ -287,10 +328,11 @@ function drawSparks() {
   paths.forEach((p, i) => {
     const len = p.getTotalLength()
     gsap.set(p, { strokeDasharray: len, strokeDashoffset: len })
-    gsap.to(p, {
+    const tween = gsap.to(p, {
       strokeDashoffset: 0, duration: 0.6, ease: 'hda', delay: i * 0.1,
       scrollTrigger: { trigger: statsEl.value, start: 'top 88%', once: true },
     })
+    sparkTweens.push(tween)
   })
 }
 
@@ -312,7 +354,7 @@ onMounted(async () => {
   onScroll()
 
   if (!reduced) initFx()
-  await fetchData()
+  await Promise.allSettled([fetchData(), fetchSituation()])
   await nextTick()
   drawSparks()
   ScrollTrigger.refresh()
@@ -320,7 +362,8 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   ctx && ctx.revert()
-  ScrollTrigger.getAll().forEach(t => t.kill())
+  sparkTweens.forEach(tween => tween.kill())
+  sparkTweens = []
   window.removeEventListener('scroll', onScroll)
 })
 </script>
@@ -337,6 +380,8 @@ onBeforeUnmount(() => {
   --gray: #5d7189;
   position: relative;
   min-height: 100%;
+  max-width: 100%;
+  overflow-x: clip;
 }
 
 /* ============ 固定背景层 ============ */
@@ -361,7 +406,7 @@ onBeforeUnmount(() => {
 .dash-body {
   position: relative; z-index: 1;
   display: flex; flex-direction: column; gap: 32px;
-  max-width: 1280px; margin: 0 auto;
+  width: min(100%, 1280px); max-width: 100%; margin: 0 auto;
 }
 
 /* ============ 毛玻璃基类 ============ */
@@ -426,8 +471,169 @@ onBeforeUnmount(() => {
 .hero-ecg svg { width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 0 6px rgba(46, 111, 224, 0.35)); }
 .hero-ecg g { will-change: transform; }
 
+/* ============ 健康态势球 ============ */
+.situation {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(190px, 260px) minmax(0, 1fr) minmax(240px, 320px);
+  align-items: center;
+  gap: 28px;
+  padding: 30px;
+  overflow: hidden;
+  max-width: 100%;
+}
+.situation::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(46, 111, 224, .08), transparent 42%),
+    repeating-linear-gradient(90deg, rgba(46, 111, 224, .055) 0 1px, transparent 1px 42px);
+  opacity: .8;
+  pointer-events: none;
+}
+.sphere-wrap, .situation-copy, .mini-events { position: relative; z-index: 1; }
+.sphere {
+  position: relative;
+  width: 230px;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  color: #2e6fe0;
+}
+.situation.excellent .sphere { color: #23a889; }
+.situation.stable .sphere { color: #2e6fe0; }
+.situation.watch .sphere { color: #ff8a00; }
+.situation.risk .sphere { color: #e5654b; }
+.orbit {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(46,111,224,.18);
+  background: conic-gradient(from 110deg, transparent 0 18%, currentColor 34%, transparent 48% 100%);
+  -webkit-mask: radial-gradient(circle, transparent 61%, #000 62%);
+  mask: radial-gradient(circle, transparent 61%, #000 62%);
+  animation: sphereSpin 8s linear infinite;
+}
+.o2 { inset: 20px; opacity: .65; animation-duration: 12s; animation-direction: reverse; }
+.o3 { inset: 40px; opacity: .5; animation-duration: 6s; }
+.pulse-dot {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 8px color-mix(in srgb, currentColor 18%, transparent);
+  animation: dotPulse 2.2s var(--ease) infinite;
+}
+.d1 { left: 18%; top: 22%; }
+.d2 { right: 14%; top: 36%; animation-delay: -.7s; }
+.d3 { left: 28%; bottom: 18%; animation-delay: -1.1s; }
+.d4 { right: 28%; bottom: 15%; animation-delay: -1.5s; }
+.sphere-core {
+  position: relative;
+  z-index: 1;
+  width: 126px;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 28%, rgba(255,255,255,.98), rgba(232,244,255,.86));
+  box-shadow: inset 0 0 28px rgba(46,111,224,.12), 0 18px 38px rgba(46,111,224,.14);
+}
+.sphere-core strong {
+  color: var(--hda-ink);
+  font-size: 44px;
+  line-height: 1;
+  font-weight: 900;
+}
+.sphere-core small {
+  margin-top: 8px;
+  color: var(--gray);
+  font-weight: 700;
+}
+.sec-kicker {
+  margin: 0 0 8px;
+  color: var(--blue);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: .14em;
+}
+.situation-copy h3 {
+  margin: 0;
+  color: var(--hda-ink);
+  font-size: 30px;
+}
+.situation-summary {
+  margin: 10px 0 16px;
+  color: var(--gray);
+  line-height: 1.8;
+}
+.deductions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+.deductions span {
+  padding: 8px 10px;
+  color: #526b89;
+  background: rgba(255,255,255,.82);
+  border: 1px solid #dce8f6;
+  font-size: 13px;
+  font-weight: 700;
+}
+.deductions b { color: #e5654b; }
+.situation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.situation-actions .btn-main,
+.situation-actions .btn-ghost {
+  min-height: 42px;
+  font-size: 15px;
+}
+.mini-events {
+  display: grid;
+  gap: 10px;
+}
+.mini-event {
+  width: 100%;
+  text-align: left;
+  padding: 14px;
+  background: rgba(255,255,255,.78);
+  border: 1px solid #dce8f6;
+  cursor: pointer;
+  transition: transform .35s var(--ease), background-color .35s ease;
+}
+.mini-event:hover {
+  transform: translateX(5px);
+  background: #fff;
+}
+.mini-event span,
+.mini-event small {
+  display: block;
+  color: #8a9bb0;
+  font-size: 12px;
+}
+.mini-event b {
+  display: block;
+  margin: 4px 0;
+  color: var(--hda-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@keyframes sphereSpin { to { transform: rotate(360deg); } }
+@keyframes dotPulse {
+  0%, 100% { transform: scale(.82); }
+  50% { transform: scale(1.18); }
+}
+
 /* ============ 统计卡片 ============ */
-.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; perspective: 800px; }
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; perspective: 800px; }
 .stat {
   position: relative; padding: 24px; cursor: pointer; overflow: hidden;
   transform: perspective(800px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
@@ -459,7 +665,7 @@ onBeforeUnmount(() => {
 
 /* ============ bento 快捷入口 ============ */
 .sec-title { margin: 0 0 16px; font-size: 22px; color: var(--hda-ink); }
-.bento { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.bento { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
 .tile {
   position: relative; display: flex; align-items: center; gap: 16px;
   min-height: 96px; padding: 24px; cursor: pointer;
@@ -515,15 +721,23 @@ onBeforeUnmount(() => {
 
 /* ============ 响应式 ============ */
 @media (max-width: 1100px) {
-  .stats { grid-template-columns: repeat(2, 1fr); }
-  .bento { grid-template-columns: repeat(2, 1fr); }
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .bento { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .tile.c2 { grid-column: span 2; }
   .hero-ecg { display: none; }
   .hero { padding: 32px 24px; }
+  .situation { grid-template-columns: 220px 1fr; }
+  .mini-events { grid-column: 1 / -1; grid-template-columns: repeat(3, 1fr); }
+  .sphere { width: 200px; }
 }
 @media (max-width: 640px) {
   .stats, .bento { grid-template-columns: 1fr; }
   .tile.c2 { grid-column: span 1; }
+  .situation { grid-template-columns: 1fr; padding: 22px; }
+  .sphere { width: 190px; justify-self: center; }
+  .mini-events { grid-template-columns: 1fr; }
+  .situation-actions .btn-main,
+  .situation-actions .btn-ghost { width: 100%; justify-content: center; }
 }
 
 /* ============ 适老化 / 减少动效 ============ */
