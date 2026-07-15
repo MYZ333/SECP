@@ -72,7 +72,7 @@
             <el-button link @click="preview(row)">预览</el-button>
             <el-button v-if="['DRAFT','FAILED','INACTIVE'].includes(row.status)" link type="primary" @click="publish(row)">发布</el-button>
             <el-button v-if="row.status === 'PUBLISHED'" link type="danger" @click="inactive(row)">停用</el-button>
-            <el-button v-if="row.status === 'INACTIVE'" link type="danger" @click="deleteDocument(row)">删除</el-button>
+            <el-button v-if="deletableStatuses.includes(row.status)" link type="danger" @click="deleteDocument(row)">删除</el-button>
           </template>
         </el-table-column>
         <template #empty>
@@ -125,6 +125,7 @@ const query = reactive({ pageNum: 1, pageSize: 10, keyword: '', status: '' })
 const activeAgent = ref('HEALTH')
 const form = reactive({ title: '', sourceOrg: '中华人民共和国国家卫生健康委员会', sourceUrl: '', publishedDate: '', versionNo: '', category: '健康科普' })
 const statuses = [{ value: 'DRAFT', label: '待审核' }, { value: 'PUBLISHED', label: '已发布' }, { value: 'FAILED', label: '索引异常' }, { value: 'INACTIVE', label: '已停用' }]
+const deletableStatuses = ['DRAFT', 'FAILED', 'INACTIVE']
 const counts = computed(() => page.records.reduce((all, item) => ({ ...all, [item.status]: (all[item.status] || 0) + 1 }), {}))
 const publishableIds = computed(() => selectedRows.value.filter(row => ['DRAFT', 'FAILED', 'INACTIVE'].includes(row.status)).map(row => row.id))
 const publishedIds = computed(() => selectedRows.value.filter(row => row.status === 'PUBLISHED').map(row => row.id))

@@ -111,7 +111,7 @@ export function buildHealthSituation(data) {
     events,
     rings: {
       metric: Math.min(metrics.filter(m => isMetricAbnormal(m)).length / 5, 1),
-      alert: Math.min(alerts.filter(a => Number(a.readFlag) !== 1).length / 5, 1),
+      alert: Math.min(alerts.filter(isAlertActive).length / 5, 1),
       consult: Math.min(sessions.filter(item => consultIssue(item)).length / 4, 1),
       medicine: Math.min(medicationAdvices.filter(a => a.status === 'PENDING_CONFIRM').length / 3, 1),
     },
@@ -166,19 +166,24 @@ async function loadMedicationAdvices(sessions, limit) {
 }
 
 function scoreAlerts(alerts, deductions) {
-  const unread = alerts.filter(item => Number(item.readFlag) !== 1)
-  const high = unread.filter(item => item.level === 'HIGH').length
-  const medium = unread.filter(item => item.level === 'MEDIUM').length
-  const low = unread.length - high - medium
+  const active = alerts.filter(isAlertActive)
+  const high = active.filter(item => item.level === 'HIGH').length
+  const medium = active.filter(item => item.level === 'MEDIUM').length
+  const low = active.length - high - medium
   const points = Math.min(high * 12 + medium * 8 + low * 5, 30)
   if (points) {
     deductions.push({
       key: 'alert',
       label: '未处理健康预警',
       points,
-      desc: `${unread.length} 条预警未读，其中高危 ${high} 条`,
+      desc: `${active.length} 条预警待处理，其中高危 ${high} 条`,
     })
   }
+}
+
+function isAlertActive(item) {
+  const status = item.status || (Number(item.readFlag) === 1 ? 'ACKNOWLEDGED' : 'OPEN')
+  return ['OPEN', 'ACKNOWLEDGED', 'IN_PROGRESS'].includes(status)
 }
 
 function scoreMetrics(metrics, deductions) {
@@ -258,7 +263,8 @@ function buildTimeline(data) {
     time: timeOf(row),
     title: row.alertType || '健康预警',
     desc: row.content || '系统生成了一条健康预警',
-    status: Number(row.readFlag) === 1 ? '已读' : '未处理',
+    status: ({ OPEN: '待处理', ACKNOWLEDGED: '待处理', IN_PROGRESS: '处理中', RESOLVED: '已解决', IGNORED: '已忽略' })[row.status]
+      || '待处理',
     actionPath: '/alert',
   }))
   data.reports.forEach(row => events.push({

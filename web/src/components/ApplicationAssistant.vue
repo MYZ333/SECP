@@ -60,7 +60,7 @@
                   <i></i><i></i><i></i>
                 </span>
                 <div v-else-if="message.role === 'assistant'" class="markdown-content"
-                     v-html="renderMarkdown(message.content)"></div>
+                     v-html="renderMarkdown(message.content)" @click="onMarkdownClick"></div>
                 <span v-else>{{ message.content }}</span>
               </div>
             </div>
@@ -93,8 +93,16 @@ import {
   ArrowLeft, ArrowRight, Bell, ChatDotRound, Close, DataAnalysis, Document,
   Goods, MagicStick, Opportunity, QuestionFilled, Top
 } from '@element-plus/icons-vue'
+import { useRouter } from 'vue-router'
 import { applicationAssistantChatStream } from '@/api'
+import { useUserStore } from '@/store/user'
+import {
+  renderApplicationAssistantLinks,
+  resolveApplicationAssistantRoute
+} from '@/utils/applicationAssistantLinks'
 
+const router = useRouter()
+const userStore = useUserStore()
 const open = ref(false)
 const input = ref('')
 const loading = ref(false)
@@ -213,17 +221,24 @@ function onEnter(event) {
   if (!event.isComposing) sendMessage()
 }
 
-function escapeHtml(value) {
-  return String(value || '').replace(/[&<>'"]/g, char => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
-  })[char])
-}
-
 function renderInline(value) {
-  return escapeHtml(value)
+  return renderApplicationAssistantLinks(value, userStore.roles)
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/`([^`]+)`/g, '<code>$1</code>')
     .replace(/\*/g, '')
+}
+
+async function onMarkdownClick(event) {
+  const link = event.target.closest?.('a[data-app-route]')
+  if (!link || !event.currentTarget.contains(link)) return
+
+  event.preventDefault()
+  const path = resolveApplicationAssistantRoute(link.dataset.appRoute, userStore.roles)
+  if (!path) return
+
+  requestController?.abort()
+  await router.push(path)
+  closePanel()
 }
 
 function renderMarkdown(content) {
@@ -462,6 +477,24 @@ onBeforeUnmount(() => {
 .markdown-content :deep(strong) { color: #17191f; font-weight: 700; }
 .markdown-content :deep(code) { padding: 1px 5px; color: #455ab7; background: #eef1ff; border-radius: 4px; font: 13px/1.5 Consolas, monospace; }
 .markdown-content :deep(hr) { height: 1px; margin: 10px 0; border: 0; background: #e5e8f2; }
+.markdown-content :deep(.app-route-link) {
+  margin-inline: 1px;
+  padding-inline: 2px;
+  color: #3156c8;
+  border-radius: 3px;
+  font-weight: 650;
+  text-decoration-line: underline;
+  text-decoration-thickness: .08em;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  transition: color .18s ease, background-color .18s ease;
+}
+.markdown-content :deep(.app-route-link:hover) { color: #1f3f9f; background: #eef3ff; }
+.markdown-content :deep(.app-route-link:focus-visible) {
+  color: #1f3f9f;
+  outline: 3px solid rgba(49, 86, 200, .24);
+  outline-offset: 2px;
+}
 .typing { display: inline-flex; align-items: center; gap: 4px; min-width: 38px; height: 20px; }
 .typing i { width: 5px; height: 5px; border-radius: 50%; background: var(--assistant-blue); animation: typingPulse 1s ease-in-out infinite; }
 .typing i:nth-child(2) { animation-delay: .14s; }
@@ -581,7 +614,8 @@ onBeforeUnmount(() => {
   .suggestion-slide-enter-active,
   .suggestion-slide-leave-active,
   .thinking-button,
-  .send-button { transition: none; }
+  .send-button,
+  .markdown-content :deep(.app-route-link) { transition: none; }
   .typing i,
   .empty-mark { animation: none; }
   .typing i { opacity: .7; }

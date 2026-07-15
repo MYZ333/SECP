@@ -8,6 +8,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 /** 个人健康档案-健康报告 */
 @Data
@@ -36,4 +37,28 @@ public class HealthReport extends BaseEntity {
 
     @Schema(description = "附件URL")
     private String fileUrl;
+
+    @Schema(description = "统计周期开始时间")
+    private LocalDateTime periodStart;
+
+    @Schema(description = "统计周期结束时间")
+    private LocalDateTime periodEnd;
+
+    @Schema(description = "综合风险等级: INSUFFICIENT/NORMAL/ATTENTION/WARNING/HIGH")
+    private String riskLevel;
+
+    @Schema(description = "生成算法版本")
+    private String algorithmVersion;
+
+    @Schema(description = "生成模式: RULE/RULE_AI")
+    private String generationMode;
+
+    @Schema(description = "有效数据条数")
+    private Integer dataCount;
+
+    @Schema(description = "数据质量, 0-1")
+    private Double dataQuality;
+
+    @Schema(description = "结构化报告JSON快照")
+    private String structuredResult;
 }

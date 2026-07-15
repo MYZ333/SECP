@@ -31,10 +31,13 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
 public class KnowledgeAdminService {
+    private static final Set<String> DELETABLE_STATUSES = Set.of("DRAFT", "FAILED", "INACTIVE");
+
     private final JdbcTemplate jdbcTemplate;
     private final KnowledgeDocumentParser parser;
     private final KnowledgeChunker chunker;
@@ -200,8 +203,8 @@ public class KnowledgeAdminService {
     public void delete(Long documentId) {
         Map<String, Object> doc = document(documentId);
         String status = String.valueOf(doc.get("status"));
-        if (!"INACTIVE".equals(status)) {
-            throw new BusinessException("只有已停用的文档才能删除，当前状态为" + status);
+        if (!DELETABLE_STATUSES.contains(status)) {
+            throw new BusinessException("只有待审核、索引异常或已停用的文档才能删除，当前状态为" + status);
         }
         jdbcTemplate.update("DELETE FROM knowledge_chunk WHERE document_id=?", documentId);
         jdbcTemplate.update("DELETE FROM knowledge_document WHERE id=?", documentId);

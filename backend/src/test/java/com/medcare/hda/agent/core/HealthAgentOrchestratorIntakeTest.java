@@ -14,6 +14,7 @@ import java.util.Optional;
 import java.util.concurrent.Executor;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -40,6 +41,8 @@ class HealthAgentOrchestratorIntakeTest {
         assertEquals("CLARIFICATION", result.route());
         assertTrue(result.direct());
         assertTrue(result.directContent().contains("什么时候开始"));
+        assertFalse(result.directContent().contains("可选答案"));
+        assertFalse(result.directContent().contains("自由填写"));
         verify(fixture.stateRepository).saveClarification(anyLong(), anyString(), anyString(), any(), any());
         verify(fixture.retrievalService, never()).search(anyString());
         verify(fixture.chatClient, never()).prompt();

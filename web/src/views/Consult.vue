@@ -81,7 +81,7 @@
               <section v-if="message.role === 'assistant' && message.recommendedDoctors?.length" class="doctor-recommendations">
                 <div class="doctor-recommendations-head">
                   <div><strong>为你匹配的医生</strong><span>匹配度仅表示资料与当前诉求的相关程度</span></div>
-                  <button type="button" @click="router.push('/doctor')">查看全部医生</button>
+                  <button type="button" @click="viewAllDoctors">查看全部医生</button>
                 </div>
                 <article v-for="doctor in message.recommendedDoctors" :key="doctor.doctorId" class="recommended-doctor">
                   <div class="recommended-doctor-main">
@@ -134,7 +134,7 @@ import { ref, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ChatDotRound, Avatar, Promotion, Plus } from '@element-plus/icons-vue'
-import { consultChatStream, consultHistory, consultSessions } from '@/api'
+import { consultChatStream, consultHistory, consultSessions, startAlertHandling } from '@/api'
 import { resolveServerUrl } from '@/config/server'
 
 const route = useRoute()
@@ -150,6 +150,7 @@ const msgBox = ref(null)
 let abortController = null
 let scrollFrame = 0
 let stageQueueTimer = 0
+let alertLinked = false
 const stageQueue = []
 const shouldFollowLatest = ref(true)
 const samples = ['最近血压有点高怎么办？', '老年人补钙吃什么好？', '血糖偏高饮食注意什么？']
@@ -211,7 +212,10 @@ function askSample(sample) {
 
 onMounted(async () => {
   try { await loadHistory() } catch (error) { ElMessage.error('历史对话加载失败') }
-  if (typeof route.query.q === 'string' && route.query.q.trim()) text.value = route.query.q.trim()
+  if (typeof route.query.q === 'string' && route.query.q.trim()) {
+    if (route.query.alertId) newConversation()
+    text.value = route.query.q.trim()
+  }
 })
 
 async function send(overrideMessage = '') {
@@ -243,6 +247,11 @@ async function send(overrideMessage = '') {
         signal: abortController.signal,
         onMeta: event => {
           saveSession(event.sessionId)
+          if (route.query.alertId && !alertLinked) {
+            alertLinked = true
+            startAlertHandling(route.query.alertId, { channel: 'HEALTH_ASSISTANT', sessionId: event.sessionId })
+              .catch(() => { alertLinked = false })
+          }
           messages.value[assistantIndex].traceId = event.traceId
           messages.value[assistantIndex].usedProfileCategories = event.usedProfileCategories || []
         },
@@ -316,7 +325,14 @@ function saveProfilePreference(value) {
 
 function startDoctorConsult(doctor) {
   if (!doctor?.doctorId) return
-  router.push({ path: doctor.action?.route || '/doctor-consult', query: { doctorId: doctor.doctorId } })
+  router.push({
+    path: doctor.action?.route || '/doctor-consult',
+    query: { doctorId: doctor.doctorId, healthAssistantSessionId: sessionId.value }
+  })
+}
+
+function viewAllDoctors() {
+  router.push({ path: '/doctor', query: { healthAssistantSessionId: sessionId.value } })
 }
 
 function stageName(stage) {

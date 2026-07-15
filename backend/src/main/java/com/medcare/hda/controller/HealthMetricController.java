@@ -8,6 +8,7 @@ import com.medcare.hda.common.PageResult;
 import com.medcare.hda.common.Result;
 import com.medcare.hda.common.ResultCode;
 import com.medcare.hda.entity.HealthMetric;
+import com.medcare.hda.event.HealthMetricChangedEvent;
 import com.medcare.hda.exception.BusinessException;
 import com.medcare.hda.security.SecurityUtil;
 import com.medcare.hda.service.HealthMetricService;
@@ -15,6 +16,8 @@ import com.medcare.hda.service.PointService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 @Tag(name = "健康档案-体征/体检数据")
@@ -25,6 +28,7 @@ public class HealthMetricController {
 
     private final HealthMetricService service;
     private final PointService pointService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Operation(summary = "分页查询(当前用户)")
     @GetMapping("/page")
@@ -50,29 +54,40 @@ public class HealthMetricController {
 
     @Operation(summary = "新增(自动按阈值判断是否异常; 测量时间不填默认当前时间)")
     @PostMapping
+    @Transactional
     public Result<HealthMetric> create(@RequestBody HealthMetric entity) {
         entity.setId(null);
         entity.setUserId(SecurityUtil.getUserId());
         if (entity.getMeasureTime() == null) {
             entity.setMeasureTime(java.time.LocalDateTime.now());
         }
+        validateMetric(entity);
         MetricRules.Judge judge = MetricRules.apply(entity);
         service.save(entity);
         // 积分任务: 记录健康数据后标记为"待领取"（到积分中心手动领取）
         pointService.markTaskReady(entity.getUserId(), "METRIC");
-        String msg = judge.abnormal() ? "已记录。注意：" + judge.message() : "新增成功";
+        eventPublisher.publishEvent(new HealthMetricChangedEvent(entity.getUserId(), entity.getId()));
+        String msg = judge.abnormal()
+                ? "已记录，系统将自动创建或更新健康预警。注意：" + judge.message()
+                : "新增成功";
         return Result.success(msg, entity);
     }
 
     @Operation(summary = "修改(自动按阈值判断是否异常)")
     @PutMapping
+    @Transactional
     public Result<HealthMetric> update(@RequestBody HealthMetric entity) {
         HealthMetric exist = service.getById(entity.getId());
         checkOwner(exist);
         entity.setUserId(SecurityUtil.getUserId());
-        MetricRules.apply(entity);
+        validateMetric(entity);
+        MetricRules.Judge judge = MetricRules.apply(entity);
         service.updateById(entity);
-        return Result.success("修改成功", entity);
+        eventPublisher.publishEvent(new HealthMetricChangedEvent(entity.getUserId(), entity.getId()));
+        String msg = judge.abnormal()
+                ? "修改成功，系统将自动创建或更新健康预警。注意：" + judge.message()
+                : "修改成功";
+        return Result.success(msg, entity);
     }
 
     @Operation(summary = "删除")
@@ -90,6 +105,13 @@ public class HealthMetricController {
         }
         if (!entity.getUserId().equals(SecurityUtil.getUserId()) && !SecurityUtil.isAdmin()) {
             throw new BusinessException(ResultCode.FORBIDDEN);
+        }
+    }
+
+    private void validateMetric(HealthMetric entity) {
+        String message = MetricRules.validationMessage(entity);
+        if (message != null) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), message);
         }
     }
 }

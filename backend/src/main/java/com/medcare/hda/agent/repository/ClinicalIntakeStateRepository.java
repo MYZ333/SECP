@@ -27,6 +27,11 @@ public class ClinicalIntakeStateRepository {
         return find(userId, sessionId, "phase='COMPLETED' AND update_time >= DATE_SUB(NOW(), INTERVAL 30 MINUTE)");
     }
 
+    /** 用于转交医生的最近一次完整问诊，不受医生推荐邀请的 30 分钟窗口限制。 */
+    public Optional<ClinicalIntakeState> findLatestCompletedForHandoff(Long userId, String sessionId) {
+        return find(userId, sessionId, "phase='COMPLETED'");
+    }
+
     private Optional<ClinicalIntakeState> find(Long userId, String sessionId, String condition) {
         List<ClinicalIntakeState> states = jdbcTemplate.query("""
                 SELECT user_id,session_id,episode_id,phase,round_count,initial_question,clinical_summary,
