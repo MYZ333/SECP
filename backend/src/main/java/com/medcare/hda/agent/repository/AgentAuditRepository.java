@@ -3,6 +3,7 @@ package com.medcare.hda.agent.repository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.medcare.hda.agent.api.AgentCitation;
+import com.medcare.hda.agent.api.DoctorRecommendation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -40,11 +41,35 @@ public class AgentAuditRepository {
     }
 
     public void saveTurn(Long userId, String sessionId, String traceId, String question, String answer,
-                         String risk, List<AgentCitation> citations, List<String> categories) {
+                         String risk, List<AgentCitation> citations, List<String> categories,
+                         List<DoctorRecommendation> recommendedDoctors) {
         safe(() -> jdbcTemplate.update("""
-                INSERT INTO agent_chat_turn(user_id,session_id,trace_id,question,answer,risk_level,citations_json,profile_categories_json)
-                VALUES(?,?,?,?,?,?,?,?)
-                """, userId, sessionId, traceId, question, answer, risk, json(citations), json(categories)));
+                INSERT INTO agent_chat_turn(user_id,session_id,trace_id,question,answer,risk_level,citations_json,
+                                            profile_categories_json,doctor_recommendations_json)
+                VALUES(?,?,?,?,?,?,?,?,?)
+                """, userId, sessionId, traceId, question, answer, risk, json(citations), json(categories),
+                json(recommendedDoctors)));
+    }
+
+    /**
+     * Only the latest assistant turn is considered. This prevents an old doctor
+     * offer in the same session from turning an unrelated short reply such as
+     * "好的" into a recommendation request.
+     */
+    public boolean wasDoctorRecommendationOffered(Long userId, String sessionId) {
+        try {
+            List<Integer> values = jdbcTemplate.queryForList("""
+                    SELECT CASE WHEN answer LIKE ? THEN 1 ELSE 0 END
+                    FROM agent_chat_turn
+                    WHERE user_id=? AND session_id=?
+                    ORDER BY create_time DESC,id DESC
+                    LIMIT 1
+                    """, Integer.class, "%匹配平台内已审核的真实医生%", userId, sessionId);
+            return !values.isEmpty() && values.getFirst() == 1;
+        } catch (Exception error) {
+            log.warn("读取医生推荐邀请状态失败，按未邀请处理: {}", error.getMessage());
+            return false;
+        }
     }
 
     private String json(Object value) {

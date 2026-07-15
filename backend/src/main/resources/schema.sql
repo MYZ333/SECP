@@ -449,8 +449,26 @@ JOIN (
 ) ranked ON ranked.id = d.id
 JOIN sys_user u ON u.username = CONCAT('doctor', ranked.seq)
 SET d.user_id = u.id, d.audit_status = 'APPROVED', d.status = 1;
+
+-- ---------------------------
+-- AI / RAG / 长期记忆模块完整重建
+-- schema.sql 是项目唯一初始化入口：每次执行均清空旧会话、知识库元数据、审计和长期记忆。
+-- 按业务依赖从明细表到主表删除，避免旧数据或旧表结构残留。
+-- ---------------------------
+DROP TABLE IF EXISTS long_term_memory_job;
+DROP TABLE IF EXISTS long_term_memory_history;
+DROP TABLE IF EXISTS long_term_memory;
+DROP TABLE IF EXISTS agent_chat_turn;
+DROP TABLE IF EXISTS agent_run_step;
+DROP TABLE IF EXISTS agent_run;
+DROP TABLE IF EXISTS agent_consult_state;
+DROP TABLE IF EXISTS knowledge_chunk;
+DROP TABLE IF EXISTS knowledge_document;
+DROP TABLE IF EXISTS SPRING_AI_CHAT_MEMORY;
+DROP TABLE IF EXISTS agent_chat_session;
+
 -- 健康助手 Agent 会话授权索引（消息正文由下方 SPRING_AI_CHAT_MEMORY 保存）
-CREATE TABLE IF NOT EXISTS agent_chat_session (
+CREATE TABLE agent_chat_session (
     id              BIGINT       NOT NULL AUTO_INCREMENT,
     user_id         BIGINT       NOT NULL,
     session_id      VARCHAR(36)  NOT NULL,
@@ -464,7 +482,7 @@ CREATE TABLE IF NOT EXISTS agent_chat_session (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='健康助手会话授权索引';
 
 -- Spring AI 1.0.9 JDBC 持久化对话记忆表
-CREATE TABLE IF NOT EXISTS SPRING_AI_CHAT_MEMORY (
+CREATE TABLE SPRING_AI_CHAT_MEMORY (
     conversation_id VARCHAR(36) NOT NULL,
     content         TEXT NOT NULL,
     type            ENUM('USER', 'ASSISTANT', 'SYSTEM', 'TOOL') NOT NULL,
@@ -472,7 +490,7 @@ CREATE TABLE IF NOT EXISTS SPRING_AI_CHAT_MEMORY (
     INDEX SPRING_AI_CHAT_MEMORY_CONVERSATION_ID_TIMESTAMP_IDX (conversation_id, timestamp)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Spring AI 持久化对话记忆';
 
-CREATE TABLE IF NOT EXISTS knowledge_document (
+CREATE TABLE knowledge_document (
     id BIGINT NOT NULL AUTO_INCREMENT,
     agent_type VARCHAR(20) NOT NULL DEFAULT 'HEALTH',
     title VARCHAR(200) NOT NULL,
@@ -496,7 +514,7 @@ CREATE TABLE IF NOT EXISTS knowledge_document (
     KEY idx_knowledge_status (status, update_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='健康知识库文档';
 
-CREATE TABLE IF NOT EXISTS knowledge_chunk (
+CREATE TABLE knowledge_chunk (
     id BIGINT NOT NULL AUTO_INCREMENT,
     document_id BIGINT NOT NULL,
     chunk_no INT NOT NULL,
@@ -513,7 +531,7 @@ CREATE TABLE IF NOT EXISTS knowledge_chunk (
     KEY idx_chunk_document_status (document_id, status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='健康知识库切片';
 
-CREATE TABLE IF NOT EXISTS agent_consult_state (
+CREATE TABLE agent_consult_state (
     id BIGINT NOT NULL AUTO_INCREMENT,
     user_id BIGINT NOT NULL,
     session_id VARCHAR(36) NOT NULL,
@@ -531,7 +549,7 @@ CREATE TABLE IF NOT EXISTS agent_consult_state (
     KEY idx_consult_state_phase (phase, update_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='健康助手多轮问诊状态';
 
-CREATE TABLE IF NOT EXISTS agent_run (
+CREATE TABLE agent_run (
     id BIGINT NOT NULL AUTO_INCREMENT,
     trace_id VARCHAR(36) NOT NULL,
     user_id BIGINT NOT NULL,
@@ -549,7 +567,7 @@ CREATE TABLE IF NOT EXISTS agent_run (
     KEY idx_agent_user_session (user_id, session_id, create_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='健康智能体运行审计';
 
-CREATE TABLE IF NOT EXISTS agent_run_step (
+CREATE TABLE agent_run_step (
     id BIGINT NOT NULL AUTO_INCREMENT,
     trace_id VARCHAR(36) NOT NULL,
     agent_type VARCHAR(40) NOT NULL,
@@ -561,7 +579,7 @@ CREATE TABLE IF NOT EXISTS agent_run_step (
     KEY idx_agent_step_trace (trace_id, create_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='健康智能体执行步骤';
 
-CREATE TABLE IF NOT EXISTS agent_chat_turn (
+CREATE TABLE agent_chat_turn (
     id BIGINT NOT NULL AUTO_INCREMENT,
     user_id BIGINT NOT NULL,
     session_id VARCHAR(36) NOT NULL,
@@ -571,6 +589,7 @@ CREATE TABLE IF NOT EXISTS agent_chat_turn (
     risk_level VARCHAR(20) DEFAULT NULL,
     citations_json JSON DEFAULT NULL,
     profile_categories_json JSON DEFAULT NULL,
+    doctor_recommendations_json JSON DEFAULT NULL,
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     UNIQUE KEY uk_agent_turn_trace (trace_id),
@@ -578,7 +597,7 @@ CREATE TABLE IF NOT EXISTS agent_chat_turn (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='健康智能体结构化对话轮次';
 
 -- 用户级共享长期记忆。MySQL 是事实源，Chroma 仅作为语义索引。
-CREATE TABLE IF NOT EXISTS long_term_memory (
+CREATE TABLE long_term_memory (
     id BIGINT NOT NULL AUTO_INCREMENT,
     memory_id VARCHAR(36) NOT NULL,
     user_id BIGINT NOT NULL,
@@ -606,7 +625,7 @@ CREATE TABLE IF NOT EXISTS long_term_memory (
     KEY idx_long_memory_index (index_status, retry_count, update_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户级共享长期记忆';
 
-CREATE TABLE IF NOT EXISTS long_term_memory_history (
+CREATE TABLE long_term_memory_history (
     id BIGINT NOT NULL AUTO_INCREMENT,
     memory_id VARCHAR(36) NOT NULL,
     user_id BIGINT NOT NULL,
@@ -620,7 +639,7 @@ CREATE TABLE IF NOT EXISTS long_term_memory_history (
     KEY idx_long_memory_history (user_id, memory_id, create_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='长期记忆变更历史';
 
-CREATE TABLE IF NOT EXISTS long_term_memory_job (
+CREATE TABLE long_term_memory_job (
     id BIGINT NOT NULL AUTO_INCREMENT,
     job_id VARCHAR(36) NOT NULL,
     user_id BIGINT NOT NULL,

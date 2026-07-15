@@ -71,7 +71,9 @@ public class ClinicalIntakeService {
                 ASK 时每轮只能提出一个尚未获得、且会改变风险或建议的关键问题。
                 为该问题给出2到4个互斥、易懂的快捷答案；选项不能包含诊断结论，并始终允许用户自由回答。
                 优先依次收集起病时间、部位、持续时间、严重程度、趋势、伴随症状、危险信号、年龄/孕产状态、基础病、用药和测量值。
-                已知信息不得重复追问。如果用户明显切换到无关的新健康问题，newEpisode=true。
+                当前问诊状态中的“已确认事实”是权威事实，knownFacts 必须完整保留这些事实并加入当前回答，不能只返回本轮新增事实。
+                已知信息不得重复追问：例如已确认“腹痛”后，不得再问“是否腹痛”；如仍缺部位或程度，应明确承认已有腹痛，只追问缺少的细节。
+                如果用户明显切换到无关的新健康问题，newEpisode=true，此时不要继承旧问题的事实。
                 只输出 JSON：
                 {"decision":"ASK","clinicalSummary":"...","knownFacts":["..."],"missingFields":["..."],
                  "question":{"prompt":"...","options":["...","..."],"allowFreeText":true},
@@ -85,12 +87,14 @@ public class ClinicalIntakeService {
         ClinicalIntakeAssessment.Decision decision = parseDecision(json.path("decision").asText());
         String summary = normalize(json.path("clinicalSummary").asText(), 2500);
         if (!StringUtils.hasText(summary)) summary = combinedSummary(message, state);
-        List<String> known = stringList(json.path("knownFacts"), 16, 160);
+        boolean newEpisode = json.path("newEpisode").asBoolean(false);
+        List<String> known = mergeKnownFacts(newEpisode || state == null ? List.of() : state.knownFacts(),
+                stringList(json.path("knownFacts"), 16, 160), message);
         List<String> missing = stringList(json.path("missingFields"), 16, 80);
         AgentIntakeQuestion question = parseQuestion(json.path("question"));
         if (decision == ClinicalIntakeAssessment.Decision.ASK && question == null) return ready(message, state, true);
         return new ClinicalIntakeAssessment(decision, summary, known, missing, question,
-                json.path("newEpisode").asBoolean(false), json.path("insufficient").asBoolean(false));
+                newEpisode, json.path("insufficient").asBoolean(false));
     }
 
     private ClinicalIntakeAssessment fallback(String message, ClinicalIntakeState state) {
@@ -184,7 +188,7 @@ public class ClinicalIntakeService {
     private String stateDescription(ClinicalIntakeState state) {
         if (state == null) return "无进行中的问诊";
         return "已追问轮数=" + state.roundCount() + "；最初诉求=" + state.initialQuestion()
-                + "；临床摘要=" + state.clinicalSummary() + "；已知信息=" + state.knownFacts()
+                + "；临床摘要=" + state.clinicalSummary() + "；已确认事实（不可再次询问是否存在）=" + state.knownFacts()
                 + "；仍缺信息=" + state.missingFields();
     }
 
@@ -216,6 +220,18 @@ public class ClinicalIntakeService {
         List<String> result = new ArrayList<>(values == null ? List.of() : values);
         if (StringUtils.hasText(value) && !result.contains(value)) result.add(value);
         return List.copyOf(result);
+    }
+
+    /** Model output may omit older facts; confirmed intake facts are append-only within an episode. */
+    private List<String> mergeKnownFacts(List<String> existing, List<String> modelFacts, String currentAnswer) {
+        Set<String> result = new LinkedHashSet<>();
+        if (existing != null) existing.stream().map(value -> normalize(value, 160))
+                .filter(StringUtils::hasText).forEach(result::add);
+        if (modelFacts != null) modelFacts.stream().map(value -> normalize(value, 160))
+                .filter(StringUtils::hasText).forEach(result::add);
+        String answer = normalize(currentAnswer, 160);
+        if (StringUtils.hasText(answer)) result.add(answer);
+        return result.stream().limit(16).toList();
     }
 
     private boolean containsAny(String value, List<String> words) {

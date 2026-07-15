@@ -6,9 +6,12 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
@@ -17,9 +20,23 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class KnowledgeAdminServiceTest {
+
+    @Test
+    void defaultRagDirectoryIsLocatedFromRepositoryRoot() {
+        Path expected = Path.of("..").toAbsolutePath().normalize().resolve("data").resolve("rag").resolve("input");
+
+        assertEquals(expected, KnowledgeAdminService.resolveRagDirectory("", "input"));
+    }
+
+    @Test
+    void explicitRagDirectoryStillTakesPrecedence() {
+        Path configured = Path.of("custom-seeds");
+
+        assertEquals(configured.toAbsolutePath().normalize(),
+                KnowledgeAdminService.resolveRagDirectory(configured.toString(), "input"));
+    }
 
     @Test
     @SuppressWarnings({"rawtypes", "unchecked"})

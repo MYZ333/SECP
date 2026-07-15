@@ -40,9 +40,9 @@ public class KnowledgeAdminService {
     private final KnowledgeChunker chunker;
     private final ObjectProvider<VectorStore> vectorStoreProvider;
 
-    @Value("${hda.agent.rag.storage-dir:../data/rag/documents}")
+    @Value("${hda.agent.rag.storage-dir:}")
     private String storageDir;
-    @Value("${hda.agent.rag.seed-dir:../data/rag/input}")
+    @Value("${hda.agent.rag.seed-dir:}")
     private String seedDir;
 
     public KnowledgeAdminService(JdbcTemplate jdbcTemplate, KnowledgeDocumentParser parser, KnowledgeChunker chunker,
@@ -110,7 +110,7 @@ public class KnowledgeAdminService {
         if (!StringUtils.hasText(title) || !StringUtils.hasText(sourceOrg) || !StringUtils.hasText(sourceUrl)
                 || !StringUtils.hasText(category)) throw new BusinessException("标题、来源机构、官方链接和分类不能为空");
         try {
-            Path root = Path.of(storageDir).toAbsolutePath().normalize();
+            Path root = resolveRagDirectory(storageDir, "documents");
             Files.createDirectories(root);
             String original = Path.of(file.getOriginalFilename() == null ? "document.txt" : file.getOriginalFilename()).getFileName().toString();
             Path target = root.resolve(UUID.randomUUID() + "-" + original).normalize();
@@ -131,8 +131,8 @@ public class KnowledgeAdminService {
     @Transactional
     public int importSeeds(String agentType) {
         String normalizedAgentType = normalizeAgentType(agentType);
-        Path root = Path.of("APPLICATION".equals(normalizedAgentType) ? seedDir + "/app-assistant" : seedDir)
-                .toAbsolutePath().normalize();
+        Path root = resolveRagDirectory(seedDir, "input");
+        if ("APPLICATION".equals(normalizedAgentType)) root = root.resolve("app-assistant");
         if (!Files.isDirectory(root)) throw new BusinessException("首批语料目录不存在：" + root);
         int imported = 0;
         try (var files = Files.list(root)) {
@@ -269,9 +269,9 @@ public class KnowledgeAdminService {
     }
 
     private void deleteUploadedFile(Object filePathValue) {
-        if (filePathValue == null || !StringUtils.hasText(storageDir)) return;
+        if (filePathValue == null) return;
         try {
-            Path storageRoot = Path.of(storageDir).toAbsolutePath().normalize();
+            Path storageRoot = resolveRagDirectory(storageDir, "documents");
             Path filePath = Path.of(String.valueOf(filePathValue)).toAbsolutePath().normalize();
             // 首批语料指向只读种子目录；这里只删除上传目录内的原文件。
             if (filePath.startsWith(storageRoot)) Files.deleteIfExists(filePath);
@@ -310,6 +310,30 @@ public class KnowledgeAdminService {
         long documentId = key.longValue();
         insertChunks(documentId, chunks);
         return documentId;
+    }
+
+    /**
+     * Explicit RAG paths are respected. Without an explicit path, locate the repository data directory
+     * instead of binding the path to whichever working directory happened to launch the JVM.
+     */
+    static Path resolveRagDirectory(String configuredDir, String directoryName) {
+        if (StringUtils.hasText(configuredDir)) {
+            return Path.of(configuredDir).toAbsolutePath().normalize();
+        }
+
+        Path workingDirectory = Path.of("").toAbsolutePath().normalize();
+        for (Path current = workingDirectory; current != null; current = current.getParent()) {
+            if (Files.isRegularFile(current.resolve("backend").resolve("pom.xml"))) {
+                return current.resolve("data").resolve("rag").resolve(directoryName).normalize();
+            }
+            if (current.getFileName() != null
+                    && "backend".equals(current.getFileName().toString())
+                    && Files.isRegularFile(current.resolve("pom.xml"))
+                    && current.getParent() != null) {
+                return current.getParent().resolve("data").resolve("rag").resolve(directoryName).normalize();
+            }
+        }
+        return workingDirectory.resolve("data").resolve("rag").resolve(directoryName).normalize();
     }
 
     private void insertChunks(long documentId, List<KnowledgeChunker.Chunk> chunks) {

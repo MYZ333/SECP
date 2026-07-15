@@ -2,6 +2,7 @@ package com.medcare.hda.agent.core;
 
 import com.medcare.hda.agent.api.AgentIntakeQuestion;
 import com.medcare.hda.agent.knowledge.KnowledgeRetrievalService;
+import com.medcare.hda.agent.doctor.DoctorRecommendationTool;
 import com.medcare.hda.agent.repository.AgentAuditRepository;
 import com.medcare.hda.agent.repository.ClinicalIntakeStateRepository;
 import org.junit.jupiter.api.Test;
@@ -82,6 +83,52 @@ class HealthAgentOrchestratorIntakeTest {
         verify(fixture.retrievalService, never()).search("持续两天了");
     }
 
+    @Test
+    void shouldPreserveDoctorRecommendationIntentAcrossIntakeRounds() {
+        Fixture fixture = fixture();
+        stubConsultation(fixture);
+        ClinicalIntakeState state = new ClinicalIntakeState(1L, "session", "episode", "COLLECTING", 6,
+                "给我推荐一个医生，我最近肠胃炎犯了", "今日水样腹泻1-3次，无脓血",
+                List.of("腹泻", "今日开始", "水样便"), List.of());
+        when(fixture.stateRepository.findActive(1L, "session")).thenReturn(Optional.of(state));
+        when(fixture.intakeService.assess(anyString(), any(), any())).thenReturn(new ClinicalIntakeAssessment(
+                ClinicalIntakeAssessment.Decision.READY, state.clinicalSummary(), state.knownFacts(),
+                List.of(), null, false, false));
+
+        PreparedAgentResponse result = fixture.orchestrator.prepare(
+                1L, new AgentConversation("session", "conversation"), "没有，只是单纯的水样便", false);
+
+        assertEquals("CONSULTATION+EVIDENCE+DOCTOR_TOOL", result.route());
+        verify(fixture.doctorRecommendationTool).recommend("没有，只是单纯的水样便", state.clinicalSummary());
+    }
+
+    @Test
+    void shouldUseRecentStructuredSummaryWhenUserAcceptsLatestDoctorOffer() {
+        Fixture fixture = fixture();
+        stubConsultation(fixture);
+        ClinicalIntakeState completed = new ClinicalIntakeState(1L, "session", "episode", "COMPLETED", 4,
+                "我今天腹泻", "今日水样腹泻1-3次，无脓血", List.of("腹泻", "水样便"), List.of());
+        when(fixture.auditRepository.wasDoctorRecommendationOffered(1L, "session")).thenReturn(true);
+        when(fixture.stateRepository.findRecentCompleted(1L, "session")).thenReturn(Optional.of(completed));
+
+        PreparedAgentResponse result = fixture.orchestrator.prepare(
+                1L, new AgentConversation("session", "conversation"), "需要", false);
+
+        assertEquals("CONSULTATION+EVIDENCE+DOCTOR_TOOL", result.route());
+        verify(fixture.intakeService, never()).assess(anyString(), any(), any());
+        verify(fixture.doctorRecommendationTool).recommend("需要", completed.clinicalSummary());
+    }
+
+    private void stubConsultation(Fixture fixture) {
+        ChatClient.ChatClientRequestSpec request = mock(ChatClient.ChatClientRequestSpec.class, Answers.RETURNS_SELF);
+        ChatClient.CallResponseSpec response = mock(ChatClient.CallResponseSpec.class);
+        when(fixture.chatClient.prompt()).thenReturn(request);
+        when(request.call()).thenReturn(response);
+        when(response.content()).thenReturn("保守健康咨询摘要");
+        when(fixture.retrievalService.search(anyString())).thenReturn(List.of());
+        when(fixture.doctorRecommendationTool.recommend(anyString(), anyString())).thenReturn(List.of());
+    }
+
     private Fixture fixture() {
         HealthContextService contextService = mock(HealthContextService.class);
         when(contextService.load(anyLong(), anyBoolean())).thenReturn(HealthContext.empty());
@@ -90,14 +137,18 @@ class HealthAgentOrchestratorIntakeTest {
         when(stateRepository.findActive(anyLong(), anyString())).thenReturn(Optional.empty());
         KnowledgeRetrievalService retrievalService = mock(KnowledgeRetrievalService.class);
         AgentAuditRepository auditRepository = mock(AgentAuditRepository.class);
+        DoctorRecommendationTool doctorRecommendationTool = mock(DoctorRecommendationTool.class);
         ChatClient chatClient = mock(ChatClient.class);
         Executor executor = Runnable::run;
         HealthAgentOrchestrator orchestrator = new HealthAgentOrchestrator(contextService, new SafetyTriageService(),
-                intakeService, stateRepository, retrievalService, auditRepository, chatClient, executor, 20);
-        return new Fixture(orchestrator, intakeService, stateRepository, retrievalService, chatClient);
+                intakeService, stateRepository, retrievalService, auditRepository, doctorRecommendationTool,
+                chatClient, executor, 20, true);
+        return new Fixture(orchestrator, intakeService, stateRepository, retrievalService, auditRepository,
+                doctorRecommendationTool, chatClient);
     }
 
     private record Fixture(HealthAgentOrchestrator orchestrator, ClinicalIntakeService intakeService,
                            ClinicalIntakeStateRepository stateRepository,
-                           KnowledgeRetrievalService retrievalService, ChatClient chatClient) { }
+                           KnowledgeRetrievalService retrievalService, AgentAuditRepository auditRepository,
+                           DoctorRecommendationTool doctorRecommendationTool, ChatClient chatClient) { }
 }

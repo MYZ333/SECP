@@ -15,7 +15,7 @@ spring:
     url: jdbc:mysql://localhost:3306/hda_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
     # 生产环境用环境变量覆盖，勿把真实密码提交进仓库
     username: ${DB_USERNAME:root}
-    password: ${DB_PASSWORD:zb2733286389}
+    password: ${DB_PASSWORD:123456}
   data:
     redis:
       host: localhost
@@ -83,8 +83,9 @@ hda:
     rag:
       enabled: ${RAG_ENABLED:true}
       knowledge-collection: ${CHROMA_KNOWLEDGE_COLLECTION:${CHROMA_COLLECTION:medical_knowledge}}
-      storage-dir: ${RAG_STORAGE_DIR:../data/rag/documents}
-      seed-dir: ${RAG_SEED_DIR:../data/rag/input}
+      # 未显式配置时由后端自动定位项目 data/rag，避免依赖 JVM 启动目录。
+      storage-dir: ${RAG_STORAGE_DIR:}
+      seed-dir: ${RAG_SEED_DIR:}
       chunking:
         semantic-enabled: ${RAG_SEMANTIC_CHUNKING_ENABLED:true}
         min-chars: ${RAG_CHUNK_MIN_CHARS:280}
@@ -121,6 +122,10 @@ hda:
     intake:
       enabled: ${AGENT_INTAKE_ENABLED:true}
       max-rounds: ${AGENT_INTAKE_MAX_ROUNDS:6}
+    # 医生推荐由现有编排器按需调用，不新增智能体；Tool 固定最多返回3位医生。
+    doctor-recommendation:
+      enabled: ${DOCTOR_RECOMMENDATION_ENABLED:true}
+      limit: ${DOCTOR_RECOMMENDATION_LIMIT:3}
   # 阿里云短信。四项配置齐全时发真实短信；任一为空则为 mock 模式（验证码打印到后端日志）
   sms:
     access-key-id: ${SMS_ACCESS_KEY_ID:}

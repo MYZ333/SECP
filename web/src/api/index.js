@@ -121,6 +121,7 @@ async function postSseStream (url, data, handlers, assistantName) {
     else if (type === 'risk') handlers.onRisk?.(event)
     else if (type === 'citation') handlers.onCitation?.(event.citation)
     else if (type === 'intake') handlers.onIntake?.(event.intakeQuestion)
+    else if (type === 'doctor_recommendations') handlers.onDoctorRecommendations?.(event.recommendedDoctors || [])
     else if (type === 'delta') handlers.onDelta?.(event.content || '')
     else if (type === 'done') handlers.onDone?.()
     else if (type === 'error') throw new Error(event.content || `${assistantName}暂时不可用`)
