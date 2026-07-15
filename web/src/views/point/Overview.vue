@@ -144,10 +144,11 @@ onMounted(load)
 .panel-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 .panel-head h3 { margin: 0; font-size: 18px; }
 .task-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-.task-row { display: flex; justify-content: space-between; gap: 12px; padding: 14px; background: #f8fafd; transition: transform .32s var(--point-ease), background-color .32s ease; }
+.task-row { display: grid; grid-template-columns: minmax(0, 1fr) 52px; align-items: center; gap: 16px; min-height: 82px; padding: 14px 18px; background: #f8fafd; transition: transform .32s var(--point-ease), background-color .32s ease; }
 .task-row:hover { transform: translateX(3px); background: var(--point-soft); }
 .task-row strong, .task-row span { display: block; }
 .task-row span { margin-top: 3px; color: var(--hda-ink-soft); font-size: 13px; }
+.task-row :deep(.el-tag) { justify-self: end; width: 48px; height: 34px; display: inline-flex; align-items: center; justify-content: center; padding: 0; font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
 .record-row { display: flex; justify-content: space-between; gap: 16px; padding: 12px 8px; border-bottom: 1px solid var(--hda-line); transition: padding-left .3s var(--point-ease), background-color .3s ease; }
 .record-row:hover { padding-left: 13px; background: #fffaf0; }
 .record-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
