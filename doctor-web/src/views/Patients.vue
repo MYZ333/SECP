@@ -36,9 +36,9 @@
         <el-table-column label="账户状态" width="130">
           <template #default><el-tag type="success" effect="light">正常</el-tag></template>
         </el-table-column>
-        <el-table-column label="操作" width="150" align="right">
+        <el-table-column label="操作" width="190" align="right" class-name="action-column">
           <template #default="{ row }">
-            <el-button type="primary" plain @click="openDetail(row)">查看详情<el-icon><ArrowRight /></el-icon></el-button>
+            <el-button class="detail-action" type="primary" plain @click="openDetail(row)">查看详情<el-icon><ArrowRight /></el-icon></el-button>
           </template>
         </el-table-column>
         <template #empty>
@@ -99,6 +99,9 @@ onMounted(load)
 .text-cell { color: #435A75; }
 .table-card :deep(.patient-row) { cursor: pointer; }
 .table-card :deep(.patient-row td) { transition: background-color .2s; }
+.table-card :deep(.action-column .cell) { overflow: visible; white-space: nowrap; }
+.detail-action { min-width: 122px; justify-content: center; }
+.detail-action :deep(.el-icon) { margin-left: 4px; }
 .table-card :deep(.el-empty) { padding: 54px 0; }
 .pager { display: flex; justify-content: center; padding-top: 20px; }
 @media (max-width: 700px) { .search-box { width: 100%; } .table-card :deep(.el-card__body) { padding: 0 14px 16px; } }
