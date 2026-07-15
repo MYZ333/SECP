@@ -19,13 +19,24 @@ public class ClinicalIntakeStateRepository {
     private final ObjectMapper objectMapper;
 
     public Optional<ClinicalIntakeState> findActive(Long userId, String sessionId) {
+        return find(userId, sessionId, "phase='COLLECTING'");
+    }
+
+    /** Returns recent structured context only for handling a confirmed doctor offer. */
+    public Optional<ClinicalIntakeState> findRecentCompleted(Long userId, String sessionId) {
+        return find(userId, sessionId, "phase='COMPLETED' AND update_time >= DATE_SUB(NOW(), INTERVAL 30 MINUTE)");
+    }
+
+    private Optional<ClinicalIntakeState> find(Long userId, String sessionId, String condition) {
         List<ClinicalIntakeState> states = jdbcTemplate.query("""
                 SELECT user_id,session_id,episode_id,phase,round_count,initial_question,clinical_summary,
                        CAST(known_facts_json AS CHAR) known_facts_json,
                        CAST(missing_fields_json AS CHAR) missing_fields_json
                 FROM agent_consult_state
-                WHERE user_id=? AND session_id=? AND phase='COLLECTING'
-                """, (rs, rowNum) -> new ClinicalIntakeState(
+                WHERE user_id=? AND session_id=? AND %s
+                ORDER BY update_time DESC
+                LIMIT 1
+                """.formatted(condition), (rs, rowNum) -> new ClinicalIntakeState(
                 rs.getLong("user_id"), rs.getString("session_id"), rs.getString("episode_id"),
                 rs.getString("phase"), rs.getInt("round_count"), rs.getString("initial_question"),
                 rs.getString("clinical_summary"), parseList(rs.getString("known_facts_json")),

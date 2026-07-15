@@ -15,6 +15,7 @@ public record AgentHistoryMessage(
         @Schema(description = "风险等级，仅助手消息提供") String riskLevel,
         @Schema(description = "知识来源，仅助手消息提供") List<AgentCitation> citations,
         @Schema(description = "本次使用的健康档案类别") List<String> usedProfileCategories,
-        @Schema(description = "审计追踪 ID") String traceId
+        @Schema(description = "审计追踪 ID") String traceId,
+        @Schema(description = "本轮医生推荐") List<DoctorRecommendation> recommendedDoctors
 ) {
 }

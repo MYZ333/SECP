@@ -28,6 +28,8 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class HealthAssistantAgentService {
+    private static final String DOCTOR_RECOMMENDATION_OFFER =
+            "\n\n如果你希望进一步咨询，是否需要我根据本次问诊信息，为你匹配平台内已审核的真实医生？";
     public static final String SYSTEM_PROMPT = """
             你是一名面向普通用户的“健康信息与就医辅助助手”。你帮助用户理解健康问题、识别风险、准备就医沟通，但不能替代医生诊断、开具处方或决定治疗方案。
             必须遵守：
@@ -59,7 +61,7 @@ public class HealthAssistantAgentService {
         PreparedAgentResponse prepared = execution.prepared();
         return new AgentChatResponse(conversation.sessionId(), execution.content(), "assistant",
                 prepared.risk().level(), prepared.citations(), prepared.usedProfileCategories(), prepared.traceId(),
-                prepared.intakeQuestion());
+                prepared.intakeQuestion(), prepared.recommendedDoctors());
     }
 
     public Flux<AgentStreamEvent> stream(Long userId, AgentConversation conversation, String message, boolean useHealthProfile) {
@@ -82,12 +84,15 @@ public class HealthAssistantAgentService {
                                                    PreparedAgentResponse prepared, long start) {
         Flux<AgentStreamEvent> header = Flux.fromIterable(finalizationEvents(conversation, prepared));
         if (prepared.direct()) {
-            String content = outputSafetyService.enforce(prepared.directContent(), prepared.risk());
+            String content = addDoctorRecommendationOffer(
+                    outputSafetyService.enforce(prepared.directContent(), prepared.risk()), prepared);
             return Flux.concat(header, Flux.fromIterable(textEvents(content)),
+                    recommendationEvents(prepared),
                     persistAndDone(userId, conversation, message, prepared, content, start));
         }
 
-        StreamingSafetyWindow safetyWindow = new StreamingSafetyWindow(outputSafetyService, prepared.risk());
+        StreamingSafetyWindow safetyWindow = new StreamingSafetyWindow(outputSafetyService, prepared.risk(),
+                shouldOfferDoctorRecommendation(prepared));
         Flux<AgentStreamEvent> modelDeltas = healthAssistantChatClient.prompt()
                 .system(withLongTermMemory(userId, message, prepared.systemPrompt()))
                 .messages(healthAssistantChatMemory.get(conversation.conversationId()))
@@ -105,6 +110,7 @@ public class HealthAssistantAgentService {
                     ? Flux.empty() : Flux.just(AgentStreamEvent.delta(finalDelta));
             return Flux.concat(tail,
                     Flux.just(AgentStreamEvent.stage(AgentStageUpdate.completed("SYNTHESIZING", "回答已整合完成"))),
+                    recommendationEvents(prepared),
                     persistAndDone(userId, conversation, message, prepared,
                     safetyWindow.content(), start));
         });
@@ -123,7 +129,8 @@ public class HealthAssistantAgentService {
                             List.of(new UserMessage(message), new AssistantMessage(content)));
                     conversationRepository.touch(userId, conversation.sessionId());
                     auditRepository.saveTurn(userId, conversation.sessionId(), prepared.traceId(), message, content,
-                            prepared.risk().level(), prepared.citations(), prepared.usedProfileCategories());
+                            prepared.risk().level(), prepared.citations(), prepared.usedProfileCategories(),
+                            prepared.recommendedDoctors());
                     completeIntakeIfFinished(userId, conversation.sessionId(), prepared);
                     auditRepository.complete(prepared.traceId(), System.currentTimeMillis() - start, null);
                     enqueueLongTermMemory(userId, conversation, message, prepared.traceId(), content);
@@ -146,12 +153,13 @@ public class HealthAssistantAgentService {
                         .messages(healthAssistantChatMemory.get(conversation.conversationId()))
                         .user(message).call().content();
             }
-            String content = outputSafetyService.enforce(raw, prepared.risk());
+            String content = addDoctorRecommendationOffer(outputSafetyService.enforce(raw, prepared.risk()), prepared);
             healthAssistantChatMemory.add(conversation.conversationId(),
                     List.of(new UserMessage(message), new AssistantMessage(content)));
             conversationRepository.touch(userId, conversation.sessionId());
             auditRepository.saveTurn(userId, conversation.sessionId(), prepared.traceId(), message, content,
-                    prepared.risk().level(), prepared.citations(), prepared.usedProfileCategories());
+                    prepared.risk().level(), prepared.citations(), prepared.usedProfileCategories(),
+                    prepared.recommendedDoctors());
             completeIntakeIfFinished(userId, conversation.sessionId(), prepared);
             auditRepository.complete(prepared.traceId(), System.currentTimeMillis() - start, null);
             enqueueLongTermMemory(userId, conversation, message, prepared.traceId(), content);
@@ -180,6 +188,11 @@ public class HealthAssistantAgentService {
         return events;
     }
 
+    private Flux<AgentStreamEvent> recommendationEvents(PreparedAgentResponse prepared) {
+        if (prepared.recommendedDoctors() == null || prepared.recommendedDoctors().isEmpty()) return Flux.empty();
+        return Flux.just(AgentStreamEvent.doctorRecommendations(prepared.recommendedDoctors()));
+    }
+
     private String friendlyMessage(Throwable exception) {
         String detail = exception.getMessage();
         if (detail != null && (detail.contains("401") || detail.contains("api-key") || detail.contains("API key"))) {
@@ -190,6 +203,17 @@ public class HealthAssistantAgentService {
 
     private void completeIntakeIfFinished(Long userId, String sessionId, PreparedAgentResponse prepared) {
         if (!"CLARIFICATION".equals(prepared.route())) intakeStateRepository.complete(userId, sessionId);
+    }
+
+    private String addDoctorRecommendationOffer(String content, PreparedAgentResponse prepared) {
+        if (!shouldOfferDoctorRecommendation(prepared) || content.contains("匹配平台内已审核的真实医生")) return content;
+        return content + DOCTOR_RECOMMENDATION_OFFER;
+    }
+
+    private boolean shouldOfferDoctorRecommendation(PreparedAgentResponse prepared) {
+        String route = prepared.route() == null ? "" : prepared.route();
+        return route.startsWith("CONSULTATION") && !route.contains("DOCTOR_TOOL")
+                && !prepared.risk().emergency();
     }
 
     private String withLongTermMemory(Long userId, String message, String systemPrompt) {
@@ -215,12 +239,15 @@ public class HealthAssistantAgentService {
         private static final int WINDOW_SIZE = 48;
         private final OutputSafetyService safetyService;
         private final RiskAssessment risk;
+        private final boolean offerDoctorRecommendation;
         private final StringBuilder pending = new StringBuilder();
         private final StringBuilder emitted = new StringBuilder();
 
-        private StreamingSafetyWindow(OutputSafetyService safetyService, RiskAssessment risk) {
+        private StreamingSafetyWindow(OutputSafetyService safetyService, RiskAssessment risk,
+                                      boolean offerDoctorRecommendation) {
             this.safetyService = safetyService;
             this.risk = risk;
+            this.offerDoctorRecommendation = offerDoctorRecommendation;
         }
 
         private String accept(String token) {
@@ -241,7 +268,9 @@ public class HealthAssistantAgentService {
             pending.setLength(0);
             String current = emitted + tail;
             String suffix = safetyService.completionSuffix(current, risk);
-            String finalDelta = tail + suffix;
+            String offer = offerDoctorRecommendation && !current.contains("匹配平台内已审核的真实医生")
+                    ? DOCTOR_RECOMMENDATION_OFFER : "";
+            String finalDelta = tail + suffix + offer;
             emitted.append(finalDelta);
             return finalDelta;
         }

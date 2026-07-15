@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.medcare.hda.agent.api.AgentCitation;
 import com.medcare.hda.agent.api.AgentHistoryMessage;
 import com.medcare.hda.agent.api.AgentSessionSummary;
+import com.medcare.hda.agent.api.DoctorRecommendation;
 import com.medcare.hda.agent.core.AgentConversation;
 import com.medcare.hda.common.PageResult;
 import com.medcare.hda.common.ResultCode;
@@ -137,7 +138,10 @@ public class AgentConversationRepository {
                         ORDER BY t.create_time DESC LIMIT 1) AS profile_categories_json,
                        (SELECT t.trace_id FROM agent_chat_turn t
                         WHERE t.user_id=s.user_id AND t.session_id=s.session_id AND t.answer=m.content
-                        ORDER BY t.create_time DESC LIMIT 1) AS trace_id
+                        ORDER BY t.create_time DESC LIMIT 1) AS trace_id,
+                       (SELECT CAST(t.doctor_recommendations_json AS CHAR) FROM agent_chat_turn t
+                        WHERE t.user_id=s.user_id AND t.session_id=s.session_id AND t.answer=m.content
+                        ORDER BY t.create_time DESC LIMIT 1) AS doctor_recommendations_json
                 FROM agent_chat_session s
                 JOIN SPRING_AI_CHAT_MEMORY m ON m.conversation_id = s.conversation_id
                 WHERE s.user_id = ?
@@ -150,7 +154,8 @@ public class AgentConversationRepository {
                         rs.getString("risk_level"),
                         parseCitations(rs.getString("citations_json")),
                         parseStrings(rs.getString("profile_categories_json")),
-                        rs.getString("trace_id")),
+                        rs.getString("trace_id"),
+                        parseDoctorRecommendations(rs.getString("doctor_recommendations_json"))),
                 concat(parameters, size, (current - 1) * size));
 
         PageResult<AgentHistoryMessage> result = new PageResult<>();
@@ -188,6 +193,12 @@ public class AgentConversationRepository {
     }
 
     private List<String> parseStrings(String json) {
+        if (!StringUtils.hasText(json)) return List.of();
+        try { return objectMapper.readValue(json, new TypeReference<>() {}); }
+        catch (Exception ignored) { return List.of(); }
+    }
+
+    private List<DoctorRecommendation> parseDoctorRecommendations(String json) {
         if (!StringUtils.hasText(json)) return List.of();
         try { return objectMapper.readValue(json, new TypeReference<>() {}); }
         catch (Exception ignored) { return List.of(); }

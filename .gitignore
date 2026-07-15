@@ -72,6 +72,7 @@ uploads/avatar/
 data/rag/chroma/
 data/rag/documents/
 scripts/.chroma-venv/
+/chroma/
 
 # ---------- Local product documentation (do not commit) ----------
 /PRODUCT.md

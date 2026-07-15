@@ -78,6 +78,25 @@
                 </div>
                 <div v-if="message.intakeAnswered" class="intake-selected">已回答：{{ message.selectedIntakeAnswer }}</div>
               </section>
+              <section v-if="message.role === 'assistant' && message.recommendedDoctors?.length" class="doctor-recommendations">
+                <div class="doctor-recommendations-head">
+                  <div><strong>为你匹配的医生</strong><span>匹配度仅表示资料与当前诉求的相关程度</span></div>
+                  <button type="button" @click="router.push('/doctor')">查看全部医生</button>
+                </div>
+                <article v-for="doctor in message.recommendedDoctors" :key="doctor.doctorId" class="recommended-doctor">
+                  <div class="recommended-doctor-main">
+                    <el-avatar :size="48" :src="resolveServerUrl(doctor.avatar)">{{ doctor.name?.charAt(0) || '医' }}</el-avatar>
+                    <div class="recommended-doctor-info">
+                      <div class="recommended-doctor-title"><strong>{{ doctor.name }}</strong><span>{{ doctor.title }}</span></div>
+                      <p>{{ doctor.hospital }} · {{ doctor.department }}</p>
+                    </div>
+                    <div class="match-score"><strong>{{ doctor.matchScore }}</strong><span>匹配度</span></div>
+                  </div>
+                  <p class="recommended-speciality"><b>擅长</b>{{ doctor.speciality || '暂无详细说明' }}</p>
+                  <div class="recommend-reasons"><span v-for="reason in doctor.reasons" :key="reason">{{ reason }}</span></div>
+                  <button class="consult-doctor-button" type="button" @click="startDoctorConsult(doctor)">向 TA 咨询</button>
+                </article>
+              </section>
               <div v-if="message.role === 'assistant' && (message.riskLevel || message.usedProfileCategories?.length)" class="answer-meta">
                 <span v-if="message.riskLevel" class="risk-pill" :class="String(message.riskLevel).toLowerCase()">
                   <span class="risk-dot" aria-hidden="true"></span><span class="risk-prefix">风险评估</span><span>{{ riskLabel(message.riskLevel) }}</span>
@@ -112,12 +131,14 @@
 
 <script setup>
 import { ref, nextTick, onMounted, onBeforeUnmount } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ChatDotRound, Avatar, Promotion, Plus } from '@element-plus/icons-vue'
 import { consultChatStream, consultHistory, consultSessions } from '@/api'
+import { resolveServerUrl } from '@/config/server'
 
 const route = useRoute()
+const router = useRouter()
 const messages = ref([])
 const sessions = ref([])
 const text = ref('')
@@ -161,6 +182,7 @@ async function selectSession(id) {
     content: record.content,
     riskLevel: record.riskLevel,
     usedProfileCategories: record.usedProfileCategories || [],
+    recommendedDoctors: record.recommendedDoctors || [],
     traceId: record.traceId
   }))
   saveSession(id)
@@ -205,7 +227,7 @@ async function send(overrideMessage = '') {
   messages.value.push({ role: 'user', content: question })
   const assistantIndex = messages.value.length
   messages.value.push({
-    role: 'assistant', content: '', usedProfileCategories: [], riskLevel: '',
+    role: 'assistant', content: '', usedProfileCategories: [], recommendedDoctors: [], riskLevel: '',
     stages: [{ stage: 'SAFETY_CHECK', status: 'RUNNING', content: '正在检查紧急风险信号' }], progressExpanded: true
   })
   loading.value = true
@@ -234,6 +256,10 @@ async function send(overrideMessage = '') {
           assistant.intakeQuestion = intakeQuestion
           assistant.intakeDraft = ''
           assistant.intakeAnswered = false
+        },
+        onDoctorRecommendations: doctors => {
+          const assistant = messages.value[assistantIndex]
+          if (assistant) assistant.recommendedDoctors = doctors || []
         },
         onDelta: content => {
           const assistant = messages.value[assistantIndex]
@@ -288,8 +314,13 @@ function saveProfilePreference(value) {
   localStorage.setItem('health-assistant-use-profile', String(Boolean(value)))
 }
 
+function startDoctorConsult(doctor) {
+  if (!doctor?.doctorId) return
+  router.push({ path: doctor.action?.route || '/doctor-consult', query: { doctorId: doctor.doctorId } })
+}
+
 function stageName(stage) {
-  return ({ SAFETY_CHECK: '安全分诊', CLARIFYING: '问诊补充', ROUTING: '任务调度', CONSULTING: '咨询分析', RETRIEVING: '权威检索', SYNTHESIZING: '整合回答' })[stage] || stage
+  return ({ SAFETY_CHECK: '安全分诊', CLARIFYING: '问诊补充', ROUTING: '任务调度', CONSULTING: '咨询分析', RETRIEVING: '权威检索', MATCHING_DOCTORS: '医生匹配', SYNTHESIZING: '整合回答' })[stage] || stage
 }
 
 function progressState(message) {
@@ -440,6 +471,7 @@ onBeforeUnmount(() => {
 .agent-progress { margin: 0 0 14px; border-bottom: 1px solid #dbe7f7; color: #46617f; }.progress-summary { width: 100%; display: flex; align-items: center; gap: 8px; padding: 0 0 10px; border: 0; color: #2e6fe0; background: transparent; cursor: pointer; font: 700 12px/1.4 var(--hda-font-display); text-align: left; }.progress-summary:focus-visible { outline: 2px solid #2e6fe0; outline-offset: 3px; }.progress-indicator { width: 8px; height: 8px; flex: 0 0 8px; border-radius: 50%; background: #4b7be0; }.progress-indicator.running, .progress-row.running .progress-dot { animation: progress-pulse 1.4s ease-in-out infinite; }.progress-indicator.degraded, .progress-row.degraded .progress-dot { background: #f08b3b; }.progress-indicator.completed { background: #4b7be0; }.progress-toggle { margin-left: auto; color: #8fa0b8; font-size: 11px; font-weight: 500; }.progress-details { display: grid; gap: 2px; padding: 1px 0 12px; }.progress-row { display: grid; grid-template-columns: 8px 72px minmax(0,1fr); align-items: start; gap: 8px; padding: 5px 0; color: #7890ac; font-size: 11px; line-height: 1.55; }.progress-row strong { color: #506887; font-size: 11px; }.progress-dot { width: 6px; height: 6px; margin-top: 5px; border-radius: 50%; background: #4b7be0; }@keyframes progress-pulse { 50% { opacity: .4; transform: scale(.72); } }.progress-details-enter-active, .progress-details-leave-active { transition: opacity .18s ease, transform .18s ease; }.progress-details-enter-from, .progress-details-leave-to { opacity: 0; transform: translateY(-4px); }.msg-enter-active { transition: opacity .22s ease, transform .22s ease; }.msg-enter-from { opacity: 0; transform: translateY(8px); }
 .answer-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }.risk-pill { padding: 4px 8px; border-radius: 999px; color: #436998; background: #edf4ff; font-size: 11px; font-weight: 700; }.risk-pill.medium { color: #9a641d; background: #fff2d9; }.risk-pill.high, .risk-pill.emergency { color: #a63a31; background: #fde7e4; }.profile-used { color: #7b91ac; font-size: 11px; }.citations { margin-top: 14px; padding-top: 12px; border-top: 1px solid #e2ebf7; }.citation-title { margin-bottom: 7px; color: #7188a5; font-size: 11px; font-weight: 700; letter-spacing: .08em; }.citation-card { display: flex; align-items: flex-start; gap: 9px; padding: 9px 10px; margin-top: 6px; border-radius: 9px; color: #3b5f91; background: #f4f8fe; text-decoration: none; transition: background .18s ease, transform .18s ease; }.citation-card:hover { background: #eaf2ff; transform: translateX(2px); }.citation-index { width: 20px; height: 20px; display: grid; place-items: center; flex-shrink: 0; border-radius: 6px; color: #fff; background: #2e6fe0; font-size: 10px; }.citation-card strong, .citation-card small { display: block; }.citation-card strong { font-size: 12px; }.citation-card small { margin-top: 2px; color: #8ba0ba; font-size: 10px; }
 .intake-card { margin-top: 14px; padding: 16px; border: 1px solid #b9d2f5; border-radius: 14px; background: linear-gradient(145deg, #f8fbff, #edf4ff); }.intake-card-title { margin-bottom: 7px; color: #245dbb; font-size: 12px; font-weight: 800; }.intake-card > strong { display: block; color: #294463; font-size: 14px; line-height: 1.55; }.intake-options { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 13px; }.intake-options button, .intake-free > button { min-height: 42px; padding: 9px 12px; border: 1px solid #9ebfea; border-radius: 9px; color: #2459a5; background: #fff; cursor: pointer; font-size: 13px; transition: background .18s ease, border-color .18s ease, transform .18s ease; }.intake-options button:hover:not(:disabled), .intake-free > button:hover:not(:disabled) { border-color: #5f92da; background: #eaf2ff; transform: translateY(-1px); }.intake-options button:focus-visible, .intake-free > button:focus-visible { outline: 2px solid #2e6fe0; outline-offset: 2px; }.intake-options button:disabled, .intake-free > button:disabled { opacity: .55; cursor: not-allowed; }.intake-free { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: end; gap: 8px; margin-top: 12px; }.intake-free :deep(.el-textarea__inner) { min-height: 64px !important; border-color: #afc9ed; color: #294463; box-shadow: none; }.intake-free :deep(.el-textarea__inner::placeholder) { color: #667b96; }.intake-selected { margin-top: 11px; color: #536b88; font-size: 13px; }.intake-card.answered .intake-options, .intake-card.answered .intake-free { display: none; }
+.doctor-recommendations { display: grid; gap: 10px; margin-top: 16px; }.doctor-recommendations-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }.doctor-recommendations-head strong, .doctor-recommendations-head span { display: block; }.doctor-recommendations-head strong { color: #263b59; font-size: 15px; }.doctor-recommendations-head span { margin-top: 3px; color: #7b91ac; font-size: 11px; }.doctor-recommendations-head button { border: 0; color: #2e6fe0; background: transparent; cursor: pointer; font-weight: 700; }.recommended-doctor { padding: 15px; border: 1px solid #d5e4f7; border-radius: 13px; background: #fff; box-shadow: 0 7px 18px rgba(46,111,224,.08); }.recommended-doctor-main { display: flex; align-items: center; gap: 11px; }.recommended-doctor-info { min-width: 0; flex: 1; }.recommended-doctor-title { display: flex; align-items: center; gap: 8px; }.recommended-doctor-title strong { color: #263b59; font-size: 16px; }.recommended-doctor-title span { padding: 2px 7px; border-radius: 6px; color: #245dbb; background: #edf4ff; font-size: 11px; }.recommended-doctor-info p { margin: 3px 0 0; overflow: hidden; color: #7188a5; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }.match-score { min-width: 52px; text-align: center; }.match-score strong, .match-score span { display: block; }.match-score strong { color: #2e6fe0; font-size: 20px; }.match-score span { color: #8fa0b8; font-size: 10px; }.recommended-speciality { margin: 11px 0 8px; color: #536b88; font-size: 12px; line-height: 1.6; }.recommended-speciality b { margin-right: 7px; color: #294463; }.recommend-reasons { display: flex; flex-wrap: wrap; gap: 6px; }.recommend-reasons span { padding: 3px 7px; border-radius: 6px; color: #526f95; background: #f2f6fb; font-size: 10px; }.consult-doctor-button { width: 100%; min-height: 40px; margin-top: 12px; border: 0; border-radius: 9px; color: #fff; background: linear-gradient(135deg, #3e86ec, #2e6fe0); cursor: pointer; font-weight: 700; }.consult-doctor-button:focus-visible { outline: 2px solid #2e6fe0; outline-offset: 2px; }
 .hello { padding: 10vh 0 0; text-align: center; }.hello-orb { width: 72px; height: 72px; display: grid; place-items: center; margin: 0 auto 20px; border-radius: 16px; color: #fff; background: linear-gradient(135deg, #3e86ec, #2e6fe0); box-shadow: 0 14px 30px rgba(46,111,224,.24); }.hello h3 { color: #263b59; font-family: var(--hda-font-display); font-size: 22px; }.samples { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }.samples span { padding: 9px 14px; border: 1px solid #d4e3f8; border-radius: 9px; color: #4672b9; background: #fff; cursor: pointer; transition: .2s; }.samples span:hover { border-color: #82aceb; background: #f4f8fe; transform: translateY(-1px); }
 .composer-wrap { padding: 14px max(30px, calc((100% - 860px) / 2)) 16px; background: linear-gradient(180deg, rgba(255,255,255,.4), #fff 32%); }.input-row { display: flex; align-items: flex-end; gap: 8px; padding: 10px 10px 10px 15px; border: 1px solid #d8e5f7; border-radius: 12px; background: #fff; box-shadow: 0 10px 24px rgba(46,111,224,.1); transition: .2s; }.input-row:focus-within { border-color: #80abea; box-shadow: 0 12px 28px rgba(46,111,224,.16); }.input-row .el-textarea { flex: 1; }:deep(.el-textarea__inner) { padding: 6px 0; border: 0; box-shadow: none !important; background: transparent; line-height: 1.6; }.send-button { width: 38px; height: 38px; display: grid; place-items: center; flex-shrink: 0; border: 0; border-radius: 10px; color: #a8b7cb; background: #edf2f8; cursor: not-allowed; transition: .2s; }.send-button.ready { color: #fff; background: linear-gradient(135deg, #3e86ec, #2e6fe0); cursor: pointer; box-shadow: 0 6px 14px rgba(46,111,224,.26); }.send-button.ready:hover { transform: translateY(-1px); }.send-loading { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.35); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; }.composer-tip { padding-top: 7px; text-align: center; color: #9baabd; font-size: 10px; }@keyframes spin { to { transform: rotate(360deg); } }
 .face.working { background: #edf4ff; }.agent-loader { width: 15px; height: 15px; border: 2px solid #c7daf8; border-top-color: #2e6fe0; border-radius: 50%; animation: agent-spin .72s linear infinite; }@keyframes agent-spin { to { transform: rotate(360deg); } }

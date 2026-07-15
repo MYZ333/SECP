@@ -183,8 +183,23 @@ CREATE TABLE IF NOT EXISTS agent_chat_turn (
     risk_level VARCHAR(20) DEFAULT NULL,
     citations_json JSON DEFAULT NULL,
     profile_categories_json JSON DEFAULT NULL,
+    doctor_recommendations_json JSON DEFAULT NULL,
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     UNIQUE KEY uk_agent_turn_trace (trace_id),
     KEY idx_agent_turn_session (user_id, session_id, create_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='健康智能体结构化对话轮次';
+
+-- 兼容已创建 agent_chat_turn 的存量数据库，重复执行本脚本也不会重复加列。
+SET @has_doctor_recommendations = (
+    SELECT COUNT(*) FROM information_schema.columns
+    WHERE table_schema=DATABASE()
+      AND table_name='agent_chat_turn'
+      AND column_name='doctor_recommendations_json'
+);
+SET @ddl = IF(@has_doctor_recommendations = 0,
+              'ALTER TABLE agent_chat_turn ADD COLUMN doctor_recommendations_json JSON DEFAULT NULL AFTER profile_categories_json',
+              'SELECT 1');
+PREPARE hda_stmt FROM @ddl;
+EXECUTE hda_stmt;
+DEALLOCATE PREPARE hda_stmt;
