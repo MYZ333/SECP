@@ -16,7 +16,10 @@ export const getPatientDetail = (id) => request.get(`/doctor-portal/patient/${id
 export const pageSessions = (params) => request.get('/doctor-portal/sessions', { params })
 export const getSessionMessages = (id) => request.get(`/doctor-portal/session/${id}/messages`)
 export const sendSessionMessage = (id, data) => request.post(`/doctor-portal/session/${id}/messages`, data)
-export const closeSession = (id) => request.put(`/doctor-portal/session/${id}/close`)
+export const closeSession = (id, data = {}) => request.put(`/doctor-portal/session/${id}/close`, data)
+export const searchMedicines = (params) => request.get('/doctor-portal/medicines', { params })
+export const getMedicationAdvice = (sessionId) => request.get(`/doctor-portal/session/${sessionId}/medication-advice`)
+export const saveMedicationAdvice = (sessionId, data) => request.post(`/doctor-portal/session/${sessionId}/medication-advice`, data)
 export const uploadAttachment = (formData) =>
   request.post('/file/consult-attachment', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
 export const uploadAvatar = (formData) =>

@@ -17,6 +17,22 @@
         </div>
         <h2>{{ form.name || '医生姓名' }}</h2>
         <p>{{ form.title || '职称未填写' }}</p>
+        <div class="rating-card">
+          <div class="rating-score">
+            <strong>{{ averageRating }}</strong>
+            <span>/ 5.0</span>
+          </div>
+          <el-rate :model-value="averageRating" disabled allow-half />
+          <p>{{ ratingCount ? `${ratingCount} 条患者评价` : '暂无患者评价' }}</p>
+          <div class="rating-pie-row">
+            <div class="rating-pie" :style="ratingPieStyle"></div>
+            <div class="rating-legend">
+              <span v-for="item in ratingBreakdown" :key="item.star">
+                <i :style="{ background: item.color }"></i>{{ item.star }}星 {{ item.percent }}%
+              </span>
+            </div>
+          </div>
+        </div>
         <div class="identity-line"></div>
         <dl>
           <div><dt>医院</dt><dd>{{ form.hospital || '未填写' }}</dd></div>
@@ -72,6 +88,11 @@ const uploading = ref(false)
 const saving = ref(false)
 const initial = computed(() => (form.value.name || '医').charAt(0))
 const auditText = computed(() => ({ APPROVED: '已通过', PENDING: '待审核', REJECTED: '已拒绝' }[form.value.auditStatus] || '已通过'))
+const ratingColors = ['#2E6FE0', '#48A2FF', '#52C41A', '#F6C343', '#F06A3A']
+const averageRating = computed(() => Number(form.value.averageRating || 0))
+const ratingCount = computed(() => Number(form.value.ratingCount || 0))
+const ratingBreakdown = computed(() => buildRatingBreakdown(form.value.ratingCounts, ratingCount.value))
+const ratingPieStyle = computed(() => ({ background: buildPieGradient(ratingBreakdown.value) }))
 
 onMounted(async () => {
   try {
@@ -101,6 +122,33 @@ async function upload({ file }) {
     ElMessage.success('头像已上传，保存资料后生效')
   } finally { uploading.value = false }
 }
+
+function ratingValue(counts, star) {
+  return Number(counts?.[star] ?? counts?.[String(star)] ?? 0)
+}
+
+function buildRatingBreakdown(counts = {}, total = 0) {
+  return [5, 4, 3, 2, 1].map((star, index) => {
+    const count = ratingValue(counts, star)
+    return {
+      star,
+      count,
+      color: ratingColors[index],
+      percent: total ? Math.round((count / total) * 100) : 0
+    }
+  })
+}
+
+function buildPieGradient(items) {
+  if (!ratingCount.value) return 'conic-gradient(#E7EDF6 0 360deg)'
+  let cursor = 0
+  const stops = items.map((item, index) => {
+    const start = cursor
+    cursor = index === items.length - 1 ? 100 : cursor + item.percent
+    return `${item.color} ${start}% ${cursor}%`
+  })
+  return `conic-gradient(${stops.join(', ')})`
+}
 </script>
 
 <style scoped>
@@ -112,6 +160,17 @@ async function upload({ file }) {
 .avatar-button { position: absolute; right: -8px; bottom: -4px; width: 34px; height: 34px; padding: 0; border-radius: 50% !important; }
 .identity h2 { margin: 18px 0 2px; color: var(--hda-ink); font-size: 24px; }
 .identity > p { margin: 0; color: var(--el-color-primary); font-size: 15px; }
+.rating-card { margin-top: 18px; padding: 16px; border: 1px solid rgba(223,231,242,.9); background: #F8FAFD; text-align: left; }
+.rating-score { display: flex; align-items: baseline; gap: 4px; color: var(--hda-ink); }
+.rating-score strong { font-size: 30px; line-height: 1; }
+.rating-score span { color: #8A99AD; font-size: 13px; }
+.rating-card :deep(.el-rate) { height: 24px; margin-top: 6px; }
+.rating-card > p { margin: 4px 0 12px; color: #7D8EA4; font-size: 13px; }
+.rating-pie-row { display: grid; grid-template-columns: 72px 1fr; gap: 12px; align-items: center; }
+.rating-pie { width: 72px; height: 72px; border-radius: 50%; box-shadow: inset 0 0 0 10px rgba(255,255,255,.78), 0 6px 14px rgba(46,111,224,.12); }
+.rating-legend { min-width: 0; display: grid; gap: 3px; }
+.rating-legend span { display: flex; align-items: center; gap: 6px; color: #536981; font-size: 12px; white-space: nowrap; }
+.rating-legend i { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
 .identity-line { height: 1px; margin: 24px 0 16px; background: var(--hda-line); }
 .identity dl { margin: 0; text-align: left; }
 .identity dl div { padding: 8px 0; display: flex; justify-content: space-between; gap: 14px; }

@@ -12,4 +12,10 @@ public interface DoctorService extends IService<Doctor> {
 
     /** 在库科室列表（Redis 缓存） */
     List<String> listActiveDepartments();
+
+    /** 填充医生评分统计 */
+    void populateRatingStats(Doctor doctor);
+
+    /** 批量填充医生评分统计 */
+    void populateRatingStats(List<Doctor> doctors);
 }

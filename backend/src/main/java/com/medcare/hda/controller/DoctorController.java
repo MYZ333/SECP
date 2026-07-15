@@ -39,6 +39,7 @@ public class DoctorController {
                                 .or().like(Doctor::getHospital, keyword)
                                 .or().like(Doctor::getSpeciality, keyword))
                         .orderByDesc(Doctor::getCreateTime));
+        service.populateRatingStats(page.getRecords());
         return Result.success(PageResult.of(page));
     }
 
@@ -51,6 +52,8 @@ public class DoctorController {
     @Operation(summary = "专家详情")
     @GetMapping("/{id}")
     public Result<Doctor> get(@PathVariable Long id) {
-        return Result.success(service.getCachedById(id));
+        Doctor doctor = service.getCachedById(id);
+        service.populateRatingStats(doctor);
+        return Result.success(doctor);
     }
 }

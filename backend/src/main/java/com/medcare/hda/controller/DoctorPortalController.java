@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.medcare.hda.common.PageResult;
 import com.medcare.hda.common.Result;
 import com.medcare.hda.common.ResultCode;
+import com.medcare.hda.dto.DoctorConsultCloseDTO;
 import com.medcare.hda.dto.DoctorConsultMessageDTO;
 import com.medcare.hda.dto.DoctorConsultSessionVO;
 import com.medcare.hda.dto.DoctorStatsVO;
@@ -19,6 +20,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -47,7 +49,9 @@ public class DoctorPortalController {
     @Operation(summary = "当前医生资料")
     @GetMapping("/me")
     public Result<Doctor> me() {
-        return Result.success(currentDoctor());
+        Doctor doctor = currentDoctor();
+        doctorService.populateRatingStats(doctor);
+        return Result.success(doctor);
     }
 
     @Operation(summary = "更新当前医生资料")
@@ -63,6 +67,7 @@ public class DoctorPortalController {
         doctor.setSpeciality(payload.getSpeciality());
         doctor.setIntroduction(payload.getIntroduction());
         doctorService.updateById(doctor);
+        doctorService.populateRatingStats(doctor);
         return Result.success("保存成功", doctor);
     }
 
@@ -178,11 +183,12 @@ public class DoctorPortalController {
 
     @Operation(summary = "医生结束咨询会话")
     @PutMapping("/session/{sessionId}/close")
-    public Result<DoctorConsultSessionVO> closeSession(@PathVariable Long sessionId) {
+    public Result<DoctorConsultSessionVO> closeSession(@PathVariable Long sessionId,
+                                                       @Valid @RequestBody(required = false) DoctorConsultCloseDTO dto) {
         DoctorConsultSession session = checkDoctorSession(sessionId);
-        closeSessionIfOpen(session);
-        notifier.notifyUser(session.getUserId(), "DOCTOR_CONSULT_SESSION_CLOSED", session);
-        return Result.success("会话已结束", toVO(session));
+        closeSessionWithSummary(session, dto);
+        notifier.notifyUser(session.getUserId(), "DOCTOR_CONSULT_SUMMARY_READY", session);
+        return Result.success("总结已发送", toVO(session));
     }
 
     private Doctor currentDoctor() {
@@ -213,16 +219,35 @@ public class DoctorPortalController {
         }
     }
 
-    private void closeSessionIfOpen(DoctorConsultSession session) {
-        if (!"OPEN".equals(session.getStatus())) {
-            return;
+    private void closeSessionWithSummary(DoctorConsultSession session, DoctorConsultCloseDTO dto) {
+        String problemOverview = dto == null ? null : cleanText(dto.getProblemOverview());
+        String preliminaryAssessment = dto == null ? null : cleanText(dto.getPreliminaryAssessment());
+        String summary = dto == null ? null : cleanText(dto.getSummary());
+        String advice = dto == null ? null : cleanText(dto.getAdvice());
+        String riskWarning = dto == null ? null : cleanText(dto.getRiskWarning());
+        if (!StringUtils.hasText(problemOverview)
+                && !StringUtils.hasText(preliminaryAssessment)
+                && !StringUtils.hasText(summary)
+                && !StringUtils.hasText(advice)
+                && !StringUtils.hasText(riskWarning)) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "请至少填写一项咨询报告内容");
         }
+        session.setProblemOverview(problemOverview);
+        session.setPreliminaryAssessment(preliminaryAssessment);
+        session.setSummary(summary);
+        session.setAdvice(advice);
+        session.setRiskWarning(riskWarning);
+        session.setRecommendOffline(dto != null && Boolean.TRUE.equals(dto.getRecommendOffline()) ? 1 : 0);
         session.setStatus("CLOSED");
         session.setLastMessage("[会话已结束]");
         session.setLastMessageTime(LocalDateTime.now());
         session.setUnreadDoctor(0);
         session.setUnreadUser(0);
         sessionService.updateById(session);
+    }
+
+    private String cleanText(String value) {
+        return StringUtils.hasText(value) ? value.trim() : null;
     }
 
     private DoctorConsultSessionVO toVO(DoctorConsultSession session) {

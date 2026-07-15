@@ -39,4 +39,34 @@ public class DoctorConsultSession extends BaseEntity {
 
     @Schema(description = "医生侧未读数")
     private Integer unreadDoctor;
+
+    @Schema(description = "本次咨询问题概述")
+    private String problemOverview;
+
+    @Schema(description = "医生初步判断")
+    private String preliminaryAssessment;
+
+    @Schema(description = "本次咨询总结")
+    private String summary;
+
+    @Schema(description = "后续建议")
+    private String advice;
+
+    @Schema(description = "风险提醒")
+    private String riskWarning;
+
+    @Schema(description = "是否建议线下就医")
+    private Integer recommendOffline;
+
+    @Schema(description = "患者评分: 1-5")
+    private Integer rating;
+
+    @Schema(description = "患者评价标签，逗号分隔")
+    private String feedbackTags;
+
+    @Schema(description = "患者文字评价")
+    private String feedback;
+
+    @Schema(description = "患者评价时间")
+    private LocalDateTime feedbackTime;
 }

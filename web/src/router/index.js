@@ -31,6 +31,7 @@ const routes = [
       { path: 'admin', name: '系统管理总览', component: () => import('@/views/admin/Overview.vue'), meta: adminMeta },
       { path: 'admin/user', name: '用户管理', component: () => import('@/views/admin/UserManage.vue'), meta: adminMeta },
       { path: 'admin/product', name: '商品管理', component: () => import('@/views/admin/ProductManage.vue'), meta: adminMeta },
+      { path: 'admin/medicine', name: '药品库', component: () => import('@/views/admin/MedicineManage.vue'), meta: adminMeta },
       { path: 'admin/doctor', name: '专家管理', component: () => import('@/views/admin/DoctorManage.vue'), meta: adminMeta },
       { path: 'admin/knowledge', name: '健康知识库', component: () => import('@/views/admin/KnowledgeManage.vue'), meta: adminMeta }
     ]

@@ -28,6 +28,14 @@
             <div class="place">{{ d.hospital }} · {{ d.department }}</div>
           </div>
         </div>
+        <div class="rating-strip">
+          <div class="rating-copy">
+            <strong>{{ ratingAverage(d) }}</strong>
+            <el-rate :model-value="ratingAverage(d)" disabled allow-half />
+            <span>{{ ratingCount(d) ? `${ratingCount(d)} 条评价` : '暂无评价' }}</span>
+          </div>
+          <div class="rating-pie mini" :style="pieStyle(d)" aria-label="评分占比"></div>
+        </div>
         <div class="spec"><span class="k">擅长</span>{{ d.speciality || '—' }}</div>
         <p class="intro">{{ d.introduction }}</p>
         <div class="actions">
@@ -51,6 +59,25 @@
           <h3>{{ current.name }}</h3>
           <p class="d-title">{{ current.title }}</p>
           <p class="d-place">{{ current.hospital }} · {{ current.department }}</p>
+          <div class="drawer-rating">
+            <div>
+              <strong>{{ ratingAverage(current) }}</strong>
+              <span>/ 5.0</span>
+            </div>
+            <el-rate :model-value="ratingAverage(current)" disabled allow-half />
+            <p>{{ ratingCount(current) ? `${ratingCount(current)} 条患者评价` : '暂无患者评价' }}</p>
+          </div>
+        </div>
+        <div class="d-sec rating-sec">
+          <h4>评价占比</h4>
+          <div class="rating-detail">
+            <div class="rating-pie large" :style="pieStyle(current)" aria-label="评分占比"></div>
+            <div class="rating-legend">
+              <span v-for="item in ratingBreakdown(current)" :key="item.star">
+                <i :style="{ background: item.color }"></i>{{ item.star }}星 {{ item.percent }}%
+              </span>
+            </div>
+          </div>
         </div>
         <div class="d-sec">
           <h4>擅长领域</h4>
@@ -105,6 +132,46 @@ function askDoctor(d) {
   router.push({ path: '/doctor-consult', query: { doctorId: d.id } })
 }
 
+const ratingColors = ['#2E6FE0', '#48A2FF', '#52C41A', '#F6C343', '#F06A3A']
+
+function ratingAverage(doctor) {
+  return Number(doctor?.averageRating || 0)
+}
+
+function ratingCount(doctor) {
+  return Number(doctor?.ratingCount || 0)
+}
+
+function ratingValue(doctor, star) {
+  const counts = doctor?.ratingCounts || {}
+  return Number(counts[star] ?? counts[String(star)] ?? 0)
+}
+
+function ratingBreakdown(doctor) {
+  const total = ratingCount(doctor)
+  return [5, 4, 3, 2, 1].map((star, index) => {
+    const count = ratingValue(doctor, star)
+    return {
+      star,
+      count,
+      color: ratingColors[index],
+      percent: total ? Math.round((count / total) * 100) : 0
+    }
+  })
+}
+
+function pieStyle(doctor) {
+  const total = ratingCount(doctor)
+  if (!total) return { background: 'conic-gradient(#E7EDF6 0 360deg)' }
+  let cursor = 0
+  const stops = ratingBreakdown(doctor).map((item, index, items) => {
+    const start = cursor
+    cursor = index === items.length - 1 ? 100 : cursor + item.percent
+    return `${item.color} ${start}% ${cursor}%`
+  })
+  return { background: `conic-gradient(${stops.join(', ')})` }
+}
+
 onMounted(() => {
   load()
   getDoctorDepartments().then(res => { departments.value = res.data || [] }).catch(() => {})
@@ -151,6 +218,14 @@ onMounted(() => {
 .name-row { display: flex; align-items: center; gap: 8px; }
 .name { font-size: 20px; font-weight: 700; color: var(--hda-ink); }
 .place { color: var(--hda-ink-soft); font-size: 15px; margin-top: 4px; }
+.rating-strip { margin-top: 16px; padding: 12px; border: 1px solid rgba(223,231,242,.86); background: rgba(248,250,253,.86); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.rating-copy { min-width: 0; display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 2px 8px; }
+.rating-copy strong { color: var(--hda-ink); font-size: 24px; line-height: 1; }
+.rating-copy :deep(.el-rate) { height: 20px; }
+.rating-copy span { grid-column: 1 / -1; color: #7D8EA4; font-size: 12px; }
+.rating-pie { flex: 0 0 auto; border-radius: 50%; box-shadow: inset 0 0 0 8px rgba(255,255,255,.78), 0 6px 14px rgba(46,111,224,.12); }
+.rating-pie.mini { width: 54px; height: 54px; }
+.rating-pie.large { width: 118px; height: 118px; box-shadow: inset 0 0 0 14px rgba(255,255,255,.78), 0 8px 18px rgba(46,111,224,.14); }
 .spec { margin: 16px 0 8px; font-size: 15px; color: var(--hda-ink); }
 .spec .k {
   display: inline-block; background: var(--el-color-primary-light-9); color: var(--el-color-primary);
@@ -172,8 +247,19 @@ onMounted(() => {
 .d-head h3 { margin: 16px 0 4px; font-size: 26px; color: var(--hda-ink); }
 .d-title { margin: 0 0 4px; font-size: 16px; color: var(--el-color-primary); font-weight: 600; }
 .d-place { margin: 0; font-size: 15px; color: var(--hda-ink-soft); }
+.drawer-rating { margin: 16px auto 0; width: min(260px, 100%); padding: 14px; border: 1px solid rgba(223,231,242,.9); background: #F8FAFD; }
+.drawer-rating div { display: flex; justify-content: center; align-items: baseline; gap: 4px; }
+.drawer-rating strong { color: var(--hda-ink); font-size: 30px; line-height: 1; }
+.drawer-rating span { color: #8A99AD; font-size: 13px; }
+.drawer-rating :deep(.el-rate) { justify-content: center; height: 24px; margin-top: 6px; }
+.drawer-rating p { margin: 4px 0 0; color: #7D8EA4; font-size: 13px; }
 .d-sec { margin-top: 24px; }
 .d-sec h4 { margin: 0 0 12px; font-size: 17px; color: var(--hda-ink); }
+.rating-sec { padding: 16px; border: 1px solid rgba(223,231,242,.9); background: rgba(248,250,253,.76); }
+.rating-detail { display: grid; grid-template-columns: 118px 1fr; gap: 18px; align-items: center; }
+.rating-legend { display: grid; gap: 7px; }
+.rating-legend span { display: flex; align-items: center; gap: 8px; color: #536981; font-size: 13px; }
+.rating-legend i { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
 .d-tags { display: flex; flex-wrap: wrap; gap: 8px; }
 .d-tag {
   padding: 6px 14px; font-size: 15px; border-radius: 8px;
