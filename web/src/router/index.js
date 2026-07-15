@@ -20,6 +20,7 @@ const routes = [
       { path: 'health/metric', name: '体征数据', component: () => import('@/views/health/Metric.vue'), meta: patientMeta },
       { path: 'health/medical', name: '就诊记录', component: () => import('@/views/health/Medical.vue'), meta: patientMeta },
       { path: 'health/report', name: '健康报告', component: () => import('@/views/health/Report.vue'), meta: patientMeta },
+      { path: 'health/timeline', name: '健康时间轴', component: () => import('@/views/health/Timeline.vue'), meta: patientMeta },
       { path: 'point', name: '积分中心总览', component: () => import('@/views/point/Overview.vue'), meta: patientMeta },
       { path: 'point/mall', name: '积分商城', component: () => import('@/views/point/Mall.vue'), meta: patientMeta },
       { path: 'point/record', name: '积分明细', component: () => import('@/views/point/Record.vue'), meta: patientMeta },
