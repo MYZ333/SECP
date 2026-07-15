@@ -159,7 +159,7 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Avatar, ChatDotRound, Promotion } from '@element-plus/icons-vue'
 import {
@@ -178,6 +178,7 @@ import {
 import { resolveServerUrl } from '@/config/server'
 
 const route = useRoute()
+const router = useRouter()
 const allSessions = ref([])
 const sessions = computed(() => allSessions.value.filter(item => !isClosed(item)))
 const historySessions = computed(() => allSessions.value.filter(item => isClosed(item)))
@@ -210,11 +211,15 @@ async function loadSessions() {
 
 async function ensureSessionFromDoctor() {
   if (!route.query.doctorId) return
-  const res = await startDoctorSession(route.query.doctorId)
+  const healthAssistantSessionId = typeof route.query.healthAssistantSessionId === 'string'
+    ? route.query.healthAssistantSessionId
+    : ''
+  const res = await startDoctorSession(route.query.doctorId, { healthAssistantSessionId: healthAssistantSessionId || null })
   await loadSessions()
   const found = allSessions.value.find(s => s.session.id === res.data.session.id)
   if (found) {
     await select(found)
+    if (healthAssistantSessionId) ElMessage.success('健康助手问诊摘要已发送给医生')
     if (route.query.alertId) {
       try {
         await startAlertHandling(route.query.alertId, {
@@ -224,6 +229,10 @@ async function ensureSessionFromDoctor() {
       } catch { ElMessage.warning('咨询会话已创建，但预警状态同步失败，请稍后在预警页查看') }
       if (typeof route.query.q === 'string') text.value = route.query.q
     }
+    const nextQuery = { ...route.query }
+    delete nextQuery.doctorId
+    delete nextQuery.healthAssistantSessionId
+    await router.replace({ path: route.path, query: nextQuery })
   }
 }
 

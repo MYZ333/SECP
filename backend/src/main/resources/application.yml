@@ -32,6 +32,7 @@ spring:
   ai:
     dashscope:
 
+      # 必须由环境变量注入；仓库中不得保留任何默认密钥。
       api-key: ${ALIYUN_APIKEY:sk-ws-H.EDDXYHY.d7yz.MEQCIH8EtfOR0yo7-hjFqSYZ99iMlawbUBFOVYbIoMwo_PkbAiAw3HHKz7aAV1TtZulq0T3o8oEnzMgqOGGveAKharqmsg}
 
       chat:
@@ -126,6 +127,10 @@ hda:
     doctor-recommendation:
       enabled: ${DOCTOR_RECOMMENDATION_ENABLED:true}
       limit: ${DOCTOR_RECOMMENDATION_LIMIT:3}
+  health-report:
+    ai:
+      enabled: ${HDA_HEALTH_REPORT_AI_ENABLED:true}
+      timeout-seconds: 10
   # 阿里云短信。四项配置齐全时发真实短信；任一为空则为 mock 模式（验证码打印到后端日志）
   sms:
     access-key-id: ${SMS_ACCESS_KEY_ID:}

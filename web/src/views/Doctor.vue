@@ -132,6 +132,7 @@ function specTags(s) {
 function askDoctor(d) {
   router.push({ path: '/doctor-consult', query: {
     doctorId: d.id,
+    ...(route.query.healthAssistantSessionId ? { healthAssistantSessionId: route.query.healthAssistantSessionId } : {}),
     ...(route.query.alertId ? { alertId: route.query.alertId } : {}),
     ...(route.query.q ? { q: route.query.q } : {})
   } })

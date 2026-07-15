@@ -42,6 +42,7 @@ export const pageReport = (params) => request.get('/health/report/page', { param
 export const createReport = (data) => request.post('/health/report', data)
 export const updateReport = (data) => request.put('/health/report', data)
 export const deleteReport = (id) => request.delete(`/health/report/${id}`)
+export const getReportDetail = (id) => request.get(`/health/report/${id}/detail`)
 
 // 积分
 export const getPointBalance = () => request.get('/point/balance')
@@ -150,7 +151,7 @@ export function applicationAssistantChatStream (data, handlers = {}) {
   return postSseStream('/app-assistant/chat/stream', data, handlers, '应用助手')
 }
 
-export const startDoctorSession = (doctorId) => request.post(`/doctor-consult/session/${doctorId}`)
+export const startDoctorSession = (doctorId, data = {}) => request.post(`/doctor-consult/session/${doctorId}`, data)
 export const pageDoctorConsultSessions = (params) => request.get('/doctor-consult/sessions', { params })
 export const getDoctorConsultMessages = (sessionId) => request.get(`/doctor-consult/session/${sessionId}/messages`)
 export const sendDoctorConsultMessage = (sessionId, data) => request.post(`/doctor-consult/session/${sessionId}/messages`, data)
@@ -171,7 +172,7 @@ export const markAlertRead = (id) => request.put(`/alert/${id}/read`)
 export const startAlertHandling = (id, data) => request.put(`/alert/${id}/in-progress`, data)
 export const resolveAlert = (id, data = {}) => request.put(`/alert/${id}/resolve`, data)
 export const ignoreAlert = (id, data = {}) => request.put(`/alert/${id}/ignore`, data)
-export const generateReport = () => request.post('/health/report/generate')
+export const generateReport = (data = { rangeDays: 30, useAiNarrative: true }) => request.post('/health/report/generate', data)
 export const uploadAvatar = (formData) => request.post('/file/avatar', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
 
 // 管理端

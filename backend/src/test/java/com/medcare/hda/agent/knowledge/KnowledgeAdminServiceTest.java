@@ -61,33 +61,48 @@ class KnowledgeAdminServiceTest {
 
     @Test
     @SuppressWarnings({"rawtypes", "unchecked"})
-    void deleteRemovesChunksAndDocumentWhenAlreadyInactive() {
+    void deleteRemovesChunksAndDocumentWhenStatusIsDeletable() {
         JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
         ObjectProvider<VectorStore> provider = mock(ObjectProvider.class);
+        when(jdbcTemplate.queryForList(anyString(), eq(7L)))
+                .thenReturn(List.of(Map.of("id", 7L, "status", "DRAFT", "file_path", "")));
+        when(jdbcTemplate.queryForList(anyString(), eq(8L)))
+                .thenReturn(List.of(Map.of("id", 8L, "status", "FAILED", "file_path", "")));
         when(jdbcTemplate.queryForList(anyString(), eq(9L)))
                 .thenReturn(List.of(Map.of("id", 9L, "status", "INACTIVE", "file_path", "")));
 
         KnowledgeAdminService service = new KnowledgeAdminService(jdbcTemplate,
                 mock(KnowledgeDocumentParser.class), mock(KnowledgeChunker.class), provider);
+        service.delete(7L);
+        service.delete(8L);
         service.delete(9L);
 
+        verify(jdbcTemplate).update(contains("DELETE FROM knowledge_chunk"), eq(7L));
+        verify(jdbcTemplate).update(contains("DELETE FROM knowledge_document"), eq(7L));
+        verify(jdbcTemplate).update(contains("DELETE FROM knowledge_chunk"), eq(8L));
+        verify(jdbcTemplate).update(contains("DELETE FROM knowledge_document"), eq(8L));
         verify(jdbcTemplate).update(contains("DELETE FROM knowledge_chunk"), eq(9L));
         verify(jdbcTemplate).update(contains("DELETE FROM knowledge_document"), eq(9L));
     }
 
     @Test
     @SuppressWarnings({"rawtypes", "unchecked"})
-    void deleteRejectsDocumentThatIsNotInactive() {
+    void deleteRejectsPublishedOrIndexingDocument() {
         JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
         ObjectProvider<VectorStore> provider = mock(ObjectProvider.class);
         when(jdbcTemplate.queryForList(anyString(), eq(10L)))
                 .thenReturn(List.of(Map.of("id", 10L, "status", "PUBLISHED")));
+        when(jdbcTemplate.queryForList(anyString(), eq(11L)))
+                .thenReturn(List.of(Map.of("id", 11L, "status", "INDEXING")));
         KnowledgeAdminService service = new KnowledgeAdminService(jdbcTemplate,
                 mock(KnowledgeDocumentParser.class), mock(KnowledgeChunker.class), provider);
 
         assertThrows(com.medcare.hda.exception.BusinessException.class, () -> service.delete(10L));
+        assertThrows(com.medcare.hda.exception.BusinessException.class, () -> service.delete(11L));
 
         verify(jdbcTemplate, never()).update(contains("DELETE FROM knowledge_chunk"), eq(10L));
         verify(jdbcTemplate, never()).update(contains("DELETE FROM knowledge_document"), eq(10L));
+        verify(jdbcTemplate, never()).update(contains("DELETE FROM knowledge_chunk"), eq(11L));
+        verify(jdbcTemplate, never()).update(contains("DELETE FROM knowledge_document"), eq(11L));
     }
 }

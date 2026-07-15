@@ -7,7 +7,9 @@ import com.medcare.hda.common.Result;
 import com.medcare.hda.common.ResultCode;
 import com.medcare.hda.dto.DoctorConsultFeedbackDTO;
 import com.medcare.hda.dto.DoctorConsultMessageDTO;
+import com.medcare.hda.dto.DoctorConsultStartDTO;
 import com.medcare.hda.dto.DoctorConsultSessionVO;
+import com.medcare.hda.agent.core.HealthConsultHandoffService;
 import com.medcare.hda.entity.Doctor;
 import com.medcare.hda.entity.DoctorConsultMessage;
 import com.medcare.hda.entity.DoctorConsultSession;
@@ -40,10 +42,12 @@ public class DoctorConsultController {
     private final DoctorConsultSessionService sessionService;
     private final DoctorConsultMessageService messageService;
     private final DoctorConsultNotifier notifier;
+    private final HealthConsultHandoffService handoffService;
 
     @Operation(summary = "按医生创建或进入会话")
     @PostMapping("/session/{doctorId}")
-    public Result<DoctorConsultSessionVO> start(@PathVariable Long doctorId) {
+    public Result<DoctorConsultSessionVO> start(@PathVariable Long doctorId,
+                                                @RequestBody(required = false) DoctorConsultStartDTO dto) {
         Long userId = SecurityUtil.getUserId();
         Doctor doctor = doctorService.getById(doctorId);
         if (doctor == null || doctor.getStatus() == null || doctor.getStatus() != 1) {
@@ -66,7 +70,33 @@ public class DoctorConsultController {
             session.setLastMessageTime(LocalDateTime.now());
             sessionService.save(session);
         }
+        if (dto != null && StringUtils.hasText(dto.getHealthAssistantSessionId())) {
+            sendHealthAssistantHandoff(session, dto.getHealthAssistantSessionId());
+        }
         return Result.success(toVO(session));
+    }
+
+    private void sendHealthAssistantHandoff(DoctorConsultSession session, String healthAssistantSessionId) {
+        String summary = handoffService.summarize(session.getUserId(), healthAssistantSessionId);
+        boolean alreadySent = messageService.count(Wrappers.<DoctorConsultMessage>lambdaQuery()
+                .eq(DoctorConsultMessage::getSessionId, session.getId())
+                .eq(DoctorConsultMessage::getSenderType, "USER")
+                .eq(DoctorConsultMessage::getContent, summary)) > 0;
+        if (alreadySent) return;
+
+        DoctorConsultMessageDTO handoff = new DoctorConsultMessageDTO();
+        handoff.setContent(summary);
+        DoctorConsultMessage message = newMessage(session, "USER", handoff);
+        messageService.save(message);
+        session.setLastMessage(summary.substring(0, Math.min(summary.length(), 500)));
+        session.setLastMessageTime(LocalDateTime.now());
+        session.setUnreadDoctor((session.getUnreadDoctor() == null ? 0 : session.getUnreadDoctor()) + 1);
+        sessionService.updateById(session);
+
+        Doctor doctor = doctorService.getById(session.getDoctorId());
+        if (doctor != null && doctor.getUserId() != null) {
+            notifier.notifyUser(doctor.getUserId(), "DOCTOR_CONSULT_MESSAGE", message);
+        }
     }
 
     @Operation(summary = "我的医生咨询会话")

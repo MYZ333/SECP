@@ -1,90 +1,104 @@
-# ==========================================================
-# 智慧医养项目 · 根 .gitignore
-# ==========================================================
-
-# ---------- Java / Maven (backend) ----------
-backend/target/
+# Build outputs
 **/target/
+**/build/
+**/dist/
+**/out/
+**/unpackage/
+android/
+apk-output/
+*.class
 *.jar
 *.war
-*.class
 !.mvn/wrapper/maven-wrapper.jar
-backend/logs/
-*.log
 
-# ---------- Node / 前端 (web & miniprogram) ----------
-node_modules/
+# Java / Maven runtime files
+*.log
+logs/
+hs_err_pid*
+replay_pid*
+.mvn/timing.properties
+
+# Node.js / frontend dependencies and caches
 **/node_modules/
-web/dist/
-miniprogram/dist/
-miniprogram/unpackage/
 .npm/
+.pnpm-store/
+.yarn/cache/
+.yarn/unplugged/
+.vite/
+.cache/
+.eslintcache
+*.tsbuildinfo
 npm-debug.log*
+yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-.eslintcache
+
+# Tests and coverage
+coverage/
+.nyc_output/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Python caches and virtual environments (local scripts / RAG tooling)
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+scripts/.chroma-venv/
+
+# Environment files and secrets
+.env
+.env.*
+!.env.example
+!**/.env.example
 *.local
-
-# uni-app 编译产物
-**/unpackage/
-
-# ---------- 环境 / 敏感配置 ----------
-# 若把真实密码/密钥单独放到本地配置文件，可在此忽略
 application-local.yml
 application-prod.yml
-.env
-.env.local
-.env.*.local
 *.pem
 *.key
 
-# ---------- IDE / 编辑器 ----------
+# IDEs and editors
 .idea/
+.vscode/
+.settings/
 *.iml
 *.ipr
 *.iws
-.vscode/
 *.sublime-*
-.settings/
 .project
 .classpath
 .factorypath
+*.swp
+*.swo
+*~
 
-# ---------- 操作系统 ----------
+# Operating-system metadata
 .DS_Store
 Thumbs.db
 desktop.ini
 $RECYCLE.BIN/
 
-# ---------- 其他 ----------
+# Temporary and generated files
+/tmp/
 *.tmp
+*.temp
 *.bak
-*.swp
-out/
-build/
-dist/
-.cache/
+*.orig
 
-uploads/avatar/
-
-
-# ---------- RAG 本机运行数据（保留 data/rag/input 示例语料） ----------
-data/rag/chroma/
-data/rag/documents/
-scripts/.chroma-venv/
+# Local uploads and generated RAG indexes
+/uploads/avatar/
+/backend/uploads/
+/data/rag/chroma/
+/data/rag/documents/
 /chroma/
 
-# ---------- Local product documentation (do not commit) ----------
+# Local-only project material
 /PRODUCT.md
 /docs/
-
-android/
-apk-output/
-.vite/
-
-# ---------- Local planning and runtime uploads ----------
 /SECP/
-/backend/uploads/
 
-# ---------- Deployment package ----------
+# Local deployment package
 /deploy/

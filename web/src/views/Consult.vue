@@ -81,7 +81,7 @@
               <section v-if="message.role === 'assistant' && message.recommendedDoctors?.length" class="doctor-recommendations">
                 <div class="doctor-recommendations-head">
                   <div><strong>为你匹配的医生</strong><span>匹配度仅表示资料与当前诉求的相关程度</span></div>
-                  <button type="button" @click="router.push('/doctor')">查看全部医生</button>
+                  <button type="button" @click="viewAllDoctors">查看全部医生</button>
                 </div>
                 <article v-for="doctor in message.recommendedDoctors" :key="doctor.doctorId" class="recommended-doctor">
                   <div class="recommended-doctor-main">
@@ -325,7 +325,14 @@ function saveProfilePreference(value) {
 
 function startDoctorConsult(doctor) {
   if (!doctor?.doctorId) return
-  router.push({ path: doctor.action?.route || '/doctor-consult', query: { doctorId: doctor.doctorId } })
+  router.push({
+    path: doctor.action?.route || '/doctor-consult',
+    query: { doctorId: doctor.doctorId, healthAssistantSessionId: sessionId.value }
+  })
+}
+
+function viewAllDoctors() {
+  router.push({ path: '/doctor', query: { healthAssistantSessionId: sessionId.value } })
 }
 
 function stageName(stage) {

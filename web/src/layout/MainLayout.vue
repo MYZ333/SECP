@@ -29,7 +29,7 @@
           </template>
         </nav>
 
-        <ApplicationAssistant />
+        <ApplicationAssistant v-if="showApplicationAssistant" />
 
         <div class="user-wrap" @mouseenter="showSummary" @mouseleave="sumVisible = false" @click="sumVisible = false">
           <el-dropdown trigger="click" @command="onCommand">
@@ -103,6 +103,7 @@ const userDisplayName = computed(() => userStore.userInfo.nickname || userStore.
 const userInitial = computed(() => userDisplayName.value.charAt(0))
 const userAvatar = computed(() => resolveServerUrl(userStore.userInfo.avatar))
 const homePath = computed(() => userStore.isAdmin && !userStore.isPatient ? '/admin' : '/dashboard')
+const showApplicationAssistant = computed(() => userStore.isPatient && !route.path.startsWith('/admin'))
 
 /* —— 导航滚动收缩 —— */
 const scrolled = ref(false)

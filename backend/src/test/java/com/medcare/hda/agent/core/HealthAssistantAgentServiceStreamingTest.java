@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -136,6 +137,8 @@ class HealthAssistantAgentServiceStreamingTest {
         assertEquals("done", events.getLast().type());
         assertTrue(events.stream().filter(event -> "delta".equals(event.type()))
                 .map(AgentStreamEvent::content).reduce("", String::concat).contains("请补充"));
+        assertFalse(events.stream().filter(event -> "delta".equals(event.type()))
+                .map(AgentStreamEvent::content).reduce("", String::concat).contains("不能替代"));
         assertTrue(events.stream().anyMatch(event -> "intake".equals(event.type())
                 && event.intakeQuestion() != null));
         verify(intakeState, never()).complete(anyLong(), anyString());

@@ -39,6 +39,7 @@ public class HealthAssistantAgentService {
             4. 紧急危险信号优先建议立即呼叫当地急救电话或前往急诊。
             5. 使用清晰、平实、非评判性的中文，不制造恐慌，也不淡化风险。
             6. 按“简短结论—现在可做什么—何时就医—就医沟通要点”组织回答。不要输出资料编号、资料依据或来源列表。
+            7. 健康档案中的体征是带测量时间的历史记录。必须保留其时间语义；除非用户明确说这是当前测量值，否则不得改写成“目前/当前体温、血压、血糖”等现状。历史异常应先请用户复测或确认当前症状。
             """;
 
     private final ChatClient healthAssistantChatClient;
@@ -85,7 +86,7 @@ public class HealthAssistantAgentService {
         Flux<AgentStreamEvent> header = Flux.fromIterable(finalizationEvents(conversation, prepared));
         if (prepared.direct()) {
             String content = addDoctorRecommendationOffer(
-                    outputSafetyService.enforce(prepared.directContent(), prepared.risk()), prepared);
+                    enforceOutput(prepared.directContent(), prepared), prepared);
             return Flux.concat(header, Flux.fromIterable(textEvents(content)),
                     recommendationEvents(prepared),
                     persistAndDone(userId, conversation, message, prepared, content, start));
@@ -153,7 +154,7 @@ public class HealthAssistantAgentService {
                         .messages(healthAssistantChatMemory.get(conversation.conversationId()))
                         .user(message).call().content();
             }
-            String content = addDoctorRecommendationOffer(outputSafetyService.enforce(raw, prepared.risk()), prepared);
+            String content = addDoctorRecommendationOffer(enforceOutput(raw, prepared), prepared);
             healthAssistantChatMemory.add(conversation.conversationId(),
                     List.of(new UserMessage(message), new AssistantMessage(content)));
             conversationRepository.touch(userId, conversation.sessionId());
@@ -208,6 +209,12 @@ public class HealthAssistantAgentService {
     private String addDoctorRecommendationOffer(String content, PreparedAgentResponse prepared) {
         if (!shouldOfferDoctorRecommendation(prepared) || content.contains("匹配平台内已审核的真实医生")) return content;
         return content + DOCTOR_RECOMMENDATION_OFFER;
+    }
+
+    private String enforceOutput(String content, PreparedAgentResponse prepared) {
+        return "CLARIFICATION".equals(prepared.route())
+                ? outputSafetyService.enforceClarification(content)
+                : outputSafetyService.enforce(content, prepared.risk());
     }
 
     private boolean shouldOfferDoctorRecommendation(PreparedAgentResponse prepared) {

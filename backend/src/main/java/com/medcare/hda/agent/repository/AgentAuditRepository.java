@@ -72,6 +72,19 @@ public class AgentAuditRepository {
         }
     }
 
+    public List<HealthConsultTurn> findTurnsForHandoff(Long userId, String sessionId) {
+        return jdbcTemplate.query("""
+                SELECT question,answer,risk_level
+                FROM agent_chat_turn
+                WHERE user_id=? AND session_id=?
+                ORDER BY create_time ASC,id ASC
+                LIMIT 20
+                """, (rs, rowNum) -> new HealthConsultTurn(
+                rs.getString("question"), rs.getString("answer"), rs.getString("risk_level")), userId, sessionId);
+    }
+
+    public record HealthConsultTurn(String question, String answer, String riskLevel) {}
+
     private String json(Object value) {
         try { return objectMapper.writeValueAsString(value); }
         catch (JsonProcessingException e) { return "[]"; }

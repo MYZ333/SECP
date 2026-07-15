@@ -12,6 +12,11 @@ public class OutputSafetyService {
         return safe + completionSuffix(safe, risk);
     }
 
+    /** 追问题目的选项和输入提示由结构化卡片呈现，气泡正文不再追加通用尾注。 */
+    public String enforceClarification(String output) {
+        return sanitizeDiagnosisLanguage(output == null ? "" : output.trim());
+    }
+
     /** 可用于流式窗口的幂等文本过滤。 */
     public String sanitizeDiagnosisLanguage(String output) {
         if (output == null || output.isEmpty()) return "";
