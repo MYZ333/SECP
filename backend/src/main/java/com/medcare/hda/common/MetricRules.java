@@ -36,6 +36,43 @@ public final class MetricRules {
         };
     }
 
+    /** 是否为当前规则引擎支持分析的指标类型 */
+    public static boolean supports(String type) {
+        return "BLOOD_PRESSURE".equals(type)
+                || "BLOOD_SUGAR".equals(type)
+                || "HEART_RATE".equals(type)
+                || "TEMPERATURE".equals(type);
+    }
+
+    /**
+     * 校验体征是否落在常见设备可录入范围。这里负责识别明显误录，
+     * 与下面用于健康提示的异常阈值是两层不同规则。
+     */
+    public static String validationMessage(HealthMetric m) {
+        String type = m.getMetricType() == null ? "" : m.getMetricType();
+        Double v1 = m.getMetricValue();
+        Double v2 = m.getMetricValue2();
+        if (v1 == null) return "请输入体征数值";
+        return switch (type) {
+            case "BLOOD_PRESSURE" -> {
+                if (v2 == null) yield "请输入舒张压";
+                if (v1 < 50 || v1 > 260 || v2 < 30 || v2 > 180 || v1 <= v2) {
+                    yield "血压数值明显超出常见测量范围，请检查收缩压、舒张压或重新测量";
+                }
+                yield null;
+            }
+            case "BLOOD_SUGAR" -> v1 < 1 || v1 > 40
+                    ? "血糖数值明显超出常见测量范围（1–40 mmol/L），请检查单位或重新测量" : null;
+            case "HEART_RATE" -> v1 < 25 || v1 > 250
+                    ? "心率数值明显超出常见测量范围（25–250 次/分），请检查或重新测量" : null;
+            case "TEMPERATURE" -> v1 < 30 || v1 > 45
+                    ? "体温数值明显超出常见测量范围（30–45 ℃），请检查或重新测量" : null;
+            case "WEIGHT" -> v1 < 2 || v1 > 350
+                    ? "体重数值明显超出常见录入范围（2–350 kg），请检查单位" : null;
+            default -> null;
+        };
+    }
+
     /** 指标类型的中文名 */
     public static String typeName(String type) {
         return switch (type == null ? "" : type) {

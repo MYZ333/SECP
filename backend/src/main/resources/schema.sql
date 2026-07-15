@@ -417,11 +417,22 @@ CREATE TABLE health_alert (
     alert_type   VARCHAR(50)           DEFAULT NULL COMMENT '预警类型',
     content      TEXT                  COMMENT '预警内容/AI建议',
     read_flag    TINYINT      NOT NULL DEFAULT 0 COMMENT '是否已读:0未读1已读',
+    status       VARCHAR(20)  NOT NULL DEFAULT 'OPEN' COMMENT 'OPEN/ACKNOWLEDGED/IN_PROGRESS/RESOLVED/IGNORED',
+    trigger_count INT         NOT NULL DEFAULT 1 COMMENT '当前预警累计触发次数',
+    latest_metric_id BIGINT            DEFAULT NULL COMMENT '最近触发体征ID',
+    last_trigger_time DATETIME          DEFAULT NULL COMMENT '最近触发时间',
+    handling_channel VARCHAR(30)        DEFAULT NULL COMMENT 'HEALTH_ASSISTANT/DOCTOR_CONSULT',
+    related_session_id VARCHAR(64)      DEFAULT NULL COMMENT '关联咨询会话ID',
+    resolved_time DATETIME              DEFAULT NULL COMMENT '解决或忽略时间',
+    resolution_note VARCHAR(500)        DEFAULT NULL COMMENT '解决说明或忽略原因',
+    generation_key VARCHAR(64)         DEFAULT NULL COMMENT '同批体征生成指纹，用于防重复',
     create_time  DATETIME              DEFAULT NULL,
     update_time  DATETIME              DEFAULT NULL,
     deleted      TINYINT      NOT NULL DEFAULT 0,
     PRIMARY KEY (id),
-    KEY idx_user_id (user_id)
+    KEY idx_user_id (user_id),
+    KEY idx_alert_user_status (user_id, status, last_trigger_time),
+    UNIQUE KEY uk_alert_generation (user_id, generation_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='健康预警';
 
 -- =====================================================================

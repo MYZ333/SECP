@@ -164,8 +164,13 @@ export function doctorConsultWsUrl() {
   return createWebSocketUrl('/ws/doctor-consult', { token })
 }
 export const pageAlerts = (params) => request.get('/alert/page', { params })
+export const getAlertSummary = () => request.get('/alert/summary')
+export const getAlertPreview = () => request.get('/alert/preview')
 export const generateAlert = () => request.post('/alert/generate')
 export const markAlertRead = (id) => request.put(`/alert/${id}/read`)
+export const startAlertHandling = (id, data) => request.put(`/alert/${id}/in-progress`, data)
+export const resolveAlert = (id, data = {}) => request.put(`/alert/${id}/resolve`, data)
+export const ignoreAlert = (id, data = {}) => request.put(`/alert/${id}/ignore`, data)
 export const generateReport = () => request.post('/health/report/generate')
 export const uploadAvatar = (formData) => request.post('/file/avatar', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
 

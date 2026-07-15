@@ -278,7 +278,7 @@ async function fetchData() {
     getPointBalance(),
     pageMetric({ pageNum: 1, pageSize: 50 }),
     pageReport({ pageNum: 1, pageSize: 50 }),
-    pageAlerts({ pageNum: 1, pageSize: 50 }),
+    pageAlerts({ pageNum: 1, pageSize: 50, status: 'ACTIVE' }),
     pagePointRecords({ pageNum: 1, pageSize: 50 }),
   ])
   if (bal.status === 'fulfilled') raw.balance = bal.value.data ?? 0

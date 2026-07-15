@@ -22,9 +22,14 @@ if (-not $process) {
 }
 
 Stop-Process -Id $processId
-try {
-    Wait-Process -Id $processId -Timeout $WaitSeconds -ErrorAction Stop
-} catch {
+$deadline = (Get-Date).AddSeconds($WaitSeconds)
+while ((Get-Date) -lt $deadline) {
+    if (-not (Get-Process -Id $processId -ErrorAction SilentlyContinue)) {
+        break
+    }
+    Start-Sleep -Milliseconds 200
+}
+if (Get-Process -Id $processId -ErrorAction SilentlyContinue) {
     throw "Chroma PID $processId did not stop within $WaitSeconds seconds."
 }
 Remove-Item -LiteralPath $pidPath

@@ -98,12 +98,13 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { Search } from '@element-plus/icons-vue'
 import { pageDoctors, getDoctorDepartments } from '@/api'
 import { resolveServerUrl } from '@/config/server'
 
 const router = useRouter()
+const route = useRoute()
 const list = ref([]), total = ref(0)
 const departments = ref([])
 const titles = ['主任医师', '副主任医师', '主治医师']
@@ -129,7 +130,11 @@ function specTags(s) {
 
 /** 跳转医生咨询页，进入与该医生的实时会话 */
 function askDoctor(d) {
-  router.push({ path: '/doctor-consult', query: { doctorId: d.id } })
+  router.push({ path: '/doctor-consult', query: {
+    doctorId: d.id,
+    ...(route.query.alertId ? { alertId: route.query.alertId } : {}),
+    ...(route.query.q ? { q: route.query.q } : {})
+  } })
 }
 
 const ratingColors = ['#2E6FE0', '#48A2FF', '#52C41A', '#F6C343', '#F06A3A']

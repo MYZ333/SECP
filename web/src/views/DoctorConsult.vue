@@ -170,6 +170,7 @@ import {
   getDoctorConsultMessages,
   pageDoctorConsultSessions,
   sendDoctorConsultMessage,
+  startAlertHandling,
   startDoctorSession,
   submitDoctorConsultFeedback,
   uploadConsultAttachment
@@ -212,7 +213,18 @@ async function ensureSessionFromDoctor() {
   const res = await startDoctorSession(route.query.doctorId)
   await loadSessions()
   const found = allSessions.value.find(s => s.session.id === res.data.session.id)
-  if (found) await select(found)
+  if (found) {
+    await select(found)
+    if (route.query.alertId) {
+      try {
+        await startAlertHandling(route.query.alertId, {
+          channel: 'DOCTOR_CONSULT',
+          sessionId: String(found.session.id)
+        })
+      } catch { ElMessage.warning('咨询会话已创建，但预警状态同步失败，请稍后在预警页查看') }
+      if (typeof route.query.q === 'string') text.value = route.query.q
+    }
+  }
 }
 
 async function ensureSessionFromRoute() {

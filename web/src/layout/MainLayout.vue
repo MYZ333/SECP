@@ -88,9 +88,10 @@
 
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ElNotification } from 'element-plus'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/store/user'
-import { getPointBalance, pageMetric, pageAlerts, logoutApi } from '@/api'
+import { getPointBalance, pageMetric, getAlertSummary, logoutApi } from '@/api'
 import ApplicationAssistant from '@/components/ApplicationAssistant.vue'
 import { resolveServerUrl } from '@/config/server'
 
@@ -109,6 +110,35 @@ const onWinScroll = () => { scrolled.value = window.scrollY > 80 }
 onMounted(() => { window.addEventListener('scroll', onWinScroll, { passive: true }); onWinScroll() })
 onBeforeUnmount(() => window.removeEventListener('scroll', onWinScroll))
 
+/* —— 被动预警轮询：接收由体征事件自动生成或更新的预警 —— */
+let alertPollTimer = null
+let latestAlertTrigger = null
+async function pollHealthAlerts() {
+  if (!userStore.isPatient) return
+  try {
+    const response = await getAlertSummary()
+    const current = response.data || {}
+    const trigger = current.latestCreateTime || null
+    summary.value.alert = current.active || 0
+    if (latestAlertTrigger && trigger && trigger !== latestAlertTrigger) {
+      ElNotification({
+        title: current.highActive > 0 ? '收到高危健康预警' : '健康预警已更新',
+        message: `当前有 ${current.active || 0} 条预警待处理，点击查看详情`,
+        type: current.highActive > 0 ? 'error' : 'warning',
+        duration: 8000,
+        onClick: () => router.push('/alert')
+      })
+    }
+    latestAlertTrigger = trigger
+  } catch { /* 后台轮询失败不干扰当前页面 */ }
+}
+onMounted(() => {
+  if (!userStore.isPatient) return
+  pollHealthAlerts()
+  alertPollTimer = window.setInterval(pollHealthAlerts, 30000)
+})
+onBeforeUnmount(() => { if (alertPollTimer) window.clearInterval(alertPollTimer) })
+
 /* —— 头像 hover：今日健康摘要 —— */
 const sumVisible = ref(false)
 const sumLoaded = ref(false)
@@ -122,14 +152,14 @@ async function showSummary() {
     const [bal, met, al] = await Promise.allSettled([
       getPointBalance(),
       pageMetric({ pageNum: 1, pageSize: 30 }),
-      pageAlerts({ pageNum: 1, pageSize: 1 }),
+      getAlertSummary(),
     ])
     const today = new Date()
     const key = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
     if (bal.status === 'fulfilled') summary.value.balance = bal.value.data ?? 0
     if (met.status === 'fulfilled')
       summary.value.todayMetric = (met.value.data.records || []).filter(r => String(r.measureTime || '').slice(0, 10) === key).length
-    if (al.status === 'fulfilled') summary.value.alert = al.value.data.total
+    if (al.status === 'fulfilled') summary.value.alert = al.value.data.active
     sumLoaded.value = true
   } catch (e) { /* 静默失败，卡片保持加载态 */ }
 }
