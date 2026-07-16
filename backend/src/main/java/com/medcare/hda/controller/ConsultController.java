@@ -22,6 +22,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -84,6 +86,13 @@ public class ConsultController {
     @GetMapping("/sessions")
     public Result<List<AgentSessionSummary>> sessions() {
         return Result.success(conversationRepository.listSessions(SecurityUtil.getUserId()));
+    }
+
+    @Operation(summary = "删除健康助手对话")
+    @DeleteMapping("/sessions/{sessionId}")
+    public Result<Void> deleteSession(@PathVariable String sessionId) {
+        healthAssistantAgentService.deleteConversation(SecurityUtil.getUserId(), sessionId);
+        return Result.success("对话已删除", null);
     }
 
     private ServerSentEvent<AgentStreamEvent> event(String name, AgentStreamEvent data) {

@@ -10,11 +10,18 @@
       </button>
       <div class="history-label">历史对话</div>
       <div class="session-list">
-        <button v-for="item in sessions" :key="item.id" class="session-item"
-                :class="{ active: item.id === sessionId }" @click="selectSession(item.id)">
-          <span class="session-title">{{ item.title }}</span>
-          <span class="session-time">{{ item.time || '最近' }}</span>
-        </button>
+        <div v-for="item in sessions" :key="item.id" class="session-row"
+             :class="{ active: item.id === sessionId }">
+          <button class="session-item" @click="selectSession(item.id)">
+            <span class="session-title">{{ item.title }}</span>
+            <span class="session-time">{{ item.time || '最近' }}</span>
+          </button>
+          <button class="delete-session" type="button" :disabled="loading || deletingSessionId === item.id"
+                  :aria-label="`删除对话：${item.title}`" title="删除对话" @click.stop="deleteSession(item)">
+            <span v-if="deletingSessionId === item.id" class="delete-spinner"></span>
+            <el-icon v-else><Delete /></el-icon>
+          </button>
+        </div>
         <div v-if="!sessions.length" class="empty-session">暂无历史对话</div>
       </div>
     </aside>
@@ -132,9 +139,9 @@
 <script setup>
 import { ref, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { ChatDotRound, Avatar, Promotion, Plus } from '@element-plus/icons-vue'
-import { consultChatStream, consultHistory, consultSessions, startAlertHandling } from '@/api'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { ChatDotRound, Avatar, Promotion, Plus, Delete } from '@element-plus/icons-vue'
+import { consultChatStream, consultHistory, consultSessions, deleteConsultSession, startAlertHandling } from '@/api'
 import { resolveServerUrl } from '@/config/server'
 
 const route = useRoute()
@@ -146,6 +153,7 @@ const loading = ref(false)
 const streaming = ref(false)
 const useHealthProfile = ref(localStorage.getItem('health-assistant-use-profile') === 'true')
 const sessionId = ref('')
+const deletingSessionId = ref('')
 const msgBox = ref(null)
 let abortController = null
 let scrollFrame = 0
@@ -203,6 +211,38 @@ function newConversation() {
   messages.value = []
   localStorage.removeItem(sessionStorageKey())
   text.value = ''
+}
+
+async function deleteSession(item) {
+  if (!item?.id || loading.value || deletingSessionId.value) return
+  try {
+    await ElMessageBox.confirm(
+      `确定删除“${item.title}”吗？对话消息将永久删除，已保存的长期记忆不会随之删除。`,
+      '删除对话',
+      { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning', confirmButtonClass: 'delete-confirm' }
+    )
+  } catch (error) {
+    if (error === 'cancel' || error === 'close') return
+    ElMessage.error('无法打开删除确认')
+    return
+  }
+
+  deletingSessionId.value = item.id
+  const deletingActiveSession = sessionId.value === item.id
+  try {
+    await deleteConsultSession(item.id)
+    await refreshSessions()
+    if (deletingActiveSession) {
+      const nextSession = sessions.value[0]?.id
+      if (nextSession) await selectSession(nextSession)
+      else newConversation()
+    }
+    ElMessage.success('对话已删除')
+  } catch (error) {
+    ElMessage.error(error.message || '删除对话失败')
+  } finally {
+    deletingSessionId.value = ''
+  }
 }
 
 function askSample(sample) {
@@ -481,7 +521,7 @@ onBeforeUnmount(() => {
 .session-panel { width: 274px; flex-shrink: 0; display: flex; flex-direction: column; padding: 22px 14px; background: linear-gradient(180deg, rgba(245,249,255,.96), rgba(238,246,255,.78)); border-right: 1px solid #e3edf9; }
 .assistant-brand { display: flex; align-items: center; gap: 11px; padding: 1px 9px 22px; }.brand-mark { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 12px; color: #fff; background: linear-gradient(135deg, #3e86ec, #2e6fe0); box-shadow: 0 8px 18px rgba(46,111,224,.25); }.assistant-brand strong, .assistant-brand span { display: block; }.assistant-brand strong, .bot-name { color: #21314d; font-family: var(--hda-font-display); font-weight: 700; }.assistant-brand strong { font-size: 15px; }.assistant-brand span { margin-top: 3px; color: #9aa9be; font-size: 10px; letter-spacing: .1em; }
 .new-session { width: 100%; display: flex; align-items: center; gap: 9px; padding: 12px; border: 1px solid #cfe0fb; border-radius: 10px; color: #2e6fe0; background: #fff; cursor: pointer; transition: transform .2s ease, box-shadow .2s ease, background .2s ease; }.new-session:hover { background: #f4f8fe; box-shadow: 0 8px 18px rgba(46,111,224,.12); transform: translateY(-1px); }.new-session span { flex: 1; text-align: left; font-weight: 700; }.new-session kbd { color: #aebbd0; font: 10px/1 monospace; }
-.history-label { padding: 27px 10px 9px; color: #9aa9be; font-size: 11px; font-weight: 700; letter-spacing: .1em; }.session-list { min-height: 0; overflow-y: auto; scrollbar-width: thin; }.session-item { position: relative; width: 100%; display: block; padding: 11px 12px; margin-bottom: 3px; text-align: left; border: 0; border-radius: 9px; color: #5c6e87; background: transparent; cursor: pointer; transition: background .18s ease, color .18s ease; }.session-item:hover { background: rgba(255,255,255,.82); color: #2e6fe0; }.session-item.active { color: #2e6fe0; background: #eaf2ff; }.session-item.active::before { content: ''; position: absolute; left: 0; top: 11px; bottom: 11px; width: 3px; border-radius: 4px; background: #2e6fe0; }.session-title { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 700; }.session-time, .empty-session { display: block; margin-top: 5px; color: #a5b2c6; font-size: 10px; }.empty-session { padding: 32px 8px; text-align: center; }
+.history-label { padding: 27px 10px 9px; color: #9aa9be; font-size: 11px; font-weight: 700; letter-spacing: .1em; }.session-list { min-height: 0; overflow-y: auto; scrollbar-width: thin; }.session-row { position: relative; display: flex; align-items: stretch; margin-bottom: 3px; border-radius: 9px; transition: background .18s ease; }.session-row:hover { background: rgba(255,255,255,.82); }.session-row.active { background: #eaf2ff; }.session-row.active::before { content: ''; position: absolute; z-index: 1; left: 0; top: 11px; bottom: 11px; width: 3px; border-radius: 4px; background: #2e6fe0; }.session-item { min-width: 0; flex: 1; display: block; padding: 11px 8px 11px 12px; text-align: left; border: 0; border-radius: 9px; color: #5c6e87; background: transparent; cursor: pointer; transition: color .18s ease; }.session-item:hover, .session-row.active .session-item { color: #2e6fe0; }.delete-session { width: 34px; display: grid; place-items: center; flex: 0 0 34px; margin: 5px 4px 5px 0; border: 0; border-radius: 8px; color: #9aa9be; background: transparent; cursor: pointer; opacity: 0; transition: opacity .18s ease, color .18s ease, background .18s ease; }.session-row:hover .delete-session, .session-row:focus-within .delete-session { opacity: 1; }.delete-session:hover:not(:disabled) { color: #c74b43; background: #fdecea; }.delete-session:focus-visible { opacity: 1; outline: 2px solid #c74b43; outline-offset: -2px; }.delete-session:disabled { cursor: not-allowed; opacity: .45; }.delete-spinner { width: 13px; height: 13px; border: 2px solid #f2b9b5; border-top-color: #c74b43; border-radius: 50%; animation: spin .7s linear infinite; }.session-title { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 700; }.session-time, .empty-session { display: block; margin-top: 5px; color: #a5b2c6; font-size: 10px; }.empty-session { padding: 32px 8px; text-align: center; }
 .chat-main { min-width: 0; flex: 1; display: flex; flex-direction: column; background: rgba(255,255,255,.9); }.chat-head { display: flex; align-items: center; gap: 11px; padding: 16px 26px; border-bottom: 1px solid #e7effa; background: rgba(255,255,255,.78); }.bot, .face { display: grid; place-items: center; border-radius: 11px; }.bot { width: 40px; height: 40px; color: #fff; background: linear-gradient(135deg, #3e86ec, #2e6fe0); }.bot-name { font-size: 15px; }.bot-sub { display: flex; align-items: center; gap: 6px; margin-top: 2px; color: #8fa0b8; font-size: 11px; }.live { width: 6px; height: 6px; border-radius: 50%; background: #4bb78b; box-shadow: 0 0 0 3px #e5f6ef; }.profile-consent { margin-left: auto; display: flex; align-items: center; gap: 14px; padding: 8px 12px; border: 1px solid #e0eaf8; border-radius: 10px; background: #f7faff; transition: .2s ease; }.profile-consent.enabled { border-color: #bfd5f6; background: #edf4ff; }.profile-consent strong, .profile-consent span { display: block; }.profile-consent strong { color: #465a76; font-size: 12px; }.profile-consent span { margin-top: 2px; color: #9aa9be; font-size: 10px; }
 .messages { flex: 1; overflow-y: auto; padding: 28px max(30px, calc((100% - 860px) / 2)); scroll-behavior: smooth; }.msg { display: flex; align-items: flex-start; gap: 11px; margin: 18px 0; }.msg.user { justify-content: flex-end; }.face { width: 32px; height: 32px; flex-shrink: 0; color: #2e6fe0; background: #eaf2ff; }.assistant-response { max-width: min(79%, 700px); }.bubble { max-width: min(79%, 700px); padding: 2px; color: #344862; font-size: 15px; line-height: 1.8; }.assistant-response .bubble { max-width: none; }.bubble :deep(p) { margin: 0; }.bubble :deep(.md-spacer) { height: 14px; }.bubble :deep(h3) { margin: 20px 0 7px; color: #263b59; font-size: 16px; font-weight: 700; line-height: 1.55; }.bubble :deep(h3:first-child) { margin-top: 0; }.bubble :deep(ol), .bubble :deep(ul) { margin: 7px 0 0; padding-left: 1.55em; }.bubble :deep(li) { margin: 4px 0; padding-left: 3px; }.bubble :deep(strong) { color: #263b59; font-weight: 700; }.bubble.is-streaming::after { content: ''; display: inline-block; width: 2px; height: 1.05em; margin-left: 4px; vertical-align: -.12em; background: #2e6fe0; animation: stream-caret .85s steps(1) infinite; }@keyframes stream-caret { 50% { opacity: 0; } }.msg.user .bubble { padding: 11px 15px; color: #fff; background: linear-gradient(135deg, #3e86ec, #2e6fe0); border-radius: 12px 12px 3px 12px; box-shadow: 0 7px 17px rgba(46,111,224,.18); }.msg.user .bubble :deep(*) { color: inherit; }.msg.user .assistant-response { display: flex; justify-content: flex-end; }
 .agent-progress { margin: 0 0 14px; border-bottom: 1px solid #dbe7f7; color: #46617f; }.progress-summary { width: 100%; display: flex; align-items: center; gap: 8px; padding: 0 0 10px; border: 0; color: #2e6fe0; background: transparent; cursor: pointer; font: 700 12px/1.4 var(--hda-font-display); text-align: left; }.progress-summary:focus-visible { outline: 2px solid #2e6fe0; outline-offset: 3px; }.progress-indicator { width: 8px; height: 8px; flex: 0 0 8px; border-radius: 50%; background: #4b7be0; }.progress-indicator.running, .progress-row.running .progress-dot { animation: progress-pulse 1.4s ease-in-out infinite; }.progress-indicator.degraded, .progress-row.degraded .progress-dot { background: #f08b3b; }.progress-indicator.completed { background: #4b7be0; }.progress-toggle { margin-left: auto; color: #8fa0b8; font-size: 11px; font-weight: 500; }.progress-details { display: grid; gap: 2px; padding: 1px 0 12px; }.progress-row { display: grid; grid-template-columns: 8px 72px minmax(0,1fr); align-items: start; gap: 8px; padding: 5px 0; color: #7890ac; font-size: 11px; line-height: 1.55; }.progress-row strong { color: #506887; font-size: 11px; }.progress-dot { width: 6px; height: 6px; margin-top: 5px; border-radius: 50%; background: #4b7be0; }@keyframes progress-pulse { 50% { opacity: .4; transform: scale(.72); } }.progress-details-enter-active, .progress-details-leave-active { transition: opacity .18s ease, transform .18s ease; }.progress-details-enter-from, .progress-details-leave-to { opacity: 0; transform: translateY(-4px); }.msg-enter-active { transition: opacity .22s ease, transform .22s ease; }.msg-enter-from { opacity: 0; transform: translateY(8px); }
@@ -491,7 +531,7 @@ onBeforeUnmount(() => {
 .hello { padding: 10vh 0 0; text-align: center; }.hello-orb { width: 72px; height: 72px; display: grid; place-items: center; margin: 0 auto 20px; border-radius: 16px; color: #fff; background: linear-gradient(135deg, #3e86ec, #2e6fe0); box-shadow: 0 14px 30px rgba(46,111,224,.24); }.hello h3 { color: #263b59; font-family: var(--hda-font-display); font-size: 22px; }.samples { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }.samples span { padding: 9px 14px; border: 1px solid #d4e3f8; border-radius: 9px; color: #4672b9; background: #fff; cursor: pointer; transition: .2s; }.samples span:hover { border-color: #82aceb; background: #f4f8fe; transform: translateY(-1px); }
 .composer-wrap { padding: 14px max(30px, calc((100% - 860px) / 2)) 16px; background: linear-gradient(180deg, rgba(255,255,255,.4), #fff 32%); }.input-row { display: flex; align-items: flex-end; gap: 8px; padding: 10px 10px 10px 15px; border: 1px solid #d8e5f7; border-radius: 12px; background: #fff; box-shadow: 0 10px 24px rgba(46,111,224,.1); transition: .2s; }.input-row:focus-within { border-color: #80abea; box-shadow: 0 12px 28px rgba(46,111,224,.16); }.input-row .el-textarea { flex: 1; }:deep(.el-textarea__inner) { padding: 6px 0; border: 0; box-shadow: none !important; background: transparent; line-height: 1.6; }.send-button { width: 38px; height: 38px; display: grid; place-items: center; flex-shrink: 0; border: 0; border-radius: 10px; color: #a8b7cb; background: #edf2f8; cursor: not-allowed; transition: .2s; }.send-button.ready { color: #fff; background: linear-gradient(135deg, #3e86ec, #2e6fe0); cursor: pointer; box-shadow: 0 6px 14px rgba(46,111,224,.26); }.send-button.ready:hover { transform: translateY(-1px); }.send-loading { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.35); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; }.composer-tip { padding-top: 7px; text-align: center; color: #9baabd; font-size: 10px; }@keyframes spin { to { transform: rotate(360deg); } }
 .face.working { background: #edf4ff; }.agent-loader { width: 15px; height: 15px; border: 2px solid #c7daf8; border-top-color: #2e6fe0; border-radius: 50%; animation: agent-spin .72s linear infinite; }@keyframes agent-spin { to { transform: rotate(360deg); } }
-@media (max-width: 768px) { .chat-shell { height: calc(100vh - 96px); min-height: 520px; margin: 0; border-radius: 12px; }.session-panel { width: 64px; padding: 14px 8px; }.assistant-brand { justify-content: center; padding: 2px 0 18px; }.assistant-brand > div:last-child, .new-session span, .new-session kbd, .history-label, .session-title, .session-time { display: none; }.new-session { justify-content: center; padding: 11px; }.session-item { height: 40px; }.messages, .composer-wrap { padding-left: 16px; padding-right: 16px; }.assistant-response, .bubble { max-width: 86%; }.profile-consent > div { display: none; }.profile-consent { padding: 7px 9px; }.progress-row { grid-template-columns: 8px 66px minmax(0,1fr); }.intake-free { grid-template-columns: 1fr; } }
+@media (max-width: 768px) { .chat-shell { height: calc(100vh - 96px); min-height: 520px; margin: 0; border-radius: 12px; }.session-panel { width: 64px; padding: 14px 8px; }.assistant-brand { justify-content: center; padding: 2px 0 18px; }.assistant-brand > div:last-child, .new-session span, .new-session kbd, .history-label, .session-title, .session-time { display: none; }.new-session { justify-content: center; padding: 11px; }.session-item { height: 40px; padding: 0; }.delete-session { width: 28px; flex-basis: 28px; margin: 6px 3px 6px 0; opacity: 1; }.messages, .composer-wrap { padding-left: 16px; padding-right: 16px; }.assistant-response, .bubble { max-width: 86%; }.profile-consent > div { display: none; }.profile-consent { padding: 7px 9px; }.progress-row { grid-template-columns: 8px 66px minmax(0,1fr); }.intake-free { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { .progress-indicator.running, .progress-row.running .progress-dot, .bubble.is-streaming::after, .send-loading, .agent-loader { animation: none; }.progress-details-enter-active, .progress-details-leave-active, .msg-enter-active { transition-duration: .01ms; } }
 .risk-pill { display: inline-flex; align-items: center; gap: 7px; min-height: 32px; padding: 6px 11px; border: 1px solid #bdd4f7; border-radius: 8px; color: #245dbb; background: #edf4ff; font-size: 12px; font-weight: 700; box-shadow: 0 3px 8px rgba(46,111,224,.08); }.risk-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }.risk-prefix { padding-right: 7px; border-right: 1px solid currentColor; opacity: .72; font-size: 11px; }.risk-pill.medium { border-color: #f0ca8b; color: #9a641d; background: #fff6e7; }.risk-pill.high, .risk-pill.emergency { border-color: #efb6b0; color: #a63a31; background: #fff0ee; }.risk-pill.emergency { color: #9c2922; background: #fde5e2; }
 </style>

@@ -67,6 +67,7 @@ export const getDoctorDepartments = () => request.get('/doctor/departments')
 export const consultChat = (data) => request.post('/consult/chat', data)
 export const consultHistory = (params) => request.get('/consult/history', { params })
 export const consultSessions = () => request.get('/consult/sessions')
+export const deleteConsultSession = (sessionId) => request.delete(`/consult/sessions/${sessionId}`)
 
 export const adminPageKnowledge = (params) => request.get('/admin/knowledge/page', { params })
 export const adminKnowledgeChunks = (id) => request.get(`/admin/knowledge/${id}/chunks`)

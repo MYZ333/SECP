@@ -7,7 +7,10 @@ import org.springframework.jdbc.core.RowMapper;
 
 import java.sql.ResultSet;
 import java.util.List;
+import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
@@ -16,6 +19,45 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class AgentConversationRepositoryTest {
+
+    @Test
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    void shouldDeleteOnlyOwnedSessionAndAllConversationArtifacts() throws Exception {
+        JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
+        AgentConversationRepository repository = new AgentConversationRepository(jdbcTemplate, mock(ObjectMapper.class));
+        String sessionId = UUID.randomUUID().toString();
+        String conversationId = UUID.randomUUID().toString();
+        ResultSet resultSet = mock(ResultSet.class);
+        when(resultSet.getString("session_id")).thenReturn(sessionId);
+        when(resultSet.getString("conversation_id")).thenReturn(conversationId);
+        when(jdbcTemplate.query(contains("WHERE user_id = ? AND session_id = ?"), any(RowMapper.class), eq(7L), eq(sessionId)))
+                .thenAnswer(invocation -> {
+                    RowMapper mapper = invocation.getArgument(1);
+                    return List.of(mapper.mapRow(resultSet, 0));
+                });
+
+        assertEquals(conversationId, repository.deleteSession(7L, sessionId));
+
+        verify(jdbcTemplate).update(contains("DELETE FROM agent_run_step"), eq(7L), eq(sessionId));
+        verify(jdbcTemplate).update("DELETE FROM agent_run WHERE user_id = ? AND session_id = ?", 7L, sessionId);
+        verify(jdbcTemplate).update("DELETE FROM agent_consult_state WHERE user_id = ? AND session_id = ?", 7L, sessionId);
+        verify(jdbcTemplate).update("DELETE FROM agent_chat_turn WHERE user_id = ? AND session_id = ?", 7L, sessionId);
+        verify(jdbcTemplate).update("DELETE FROM long_term_memory_job WHERE user_id = ? AND source_session_id = ?", 7L, sessionId);
+        verify(jdbcTemplate).update("DELETE FROM SPRING_AI_CHAT_MEMORY WHERE conversation_id = ?", conversationId);
+        verify(jdbcTemplate).update("DELETE FROM agent_chat_session WHERE user_id = ? AND session_id = ?", 7L, sessionId);
+    }
+
+    @Test
+    void shouldRejectDeletingMissingOrForeignSession() {
+        JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
+        AgentConversationRepository repository = new AgentConversationRepository(jdbcTemplate, mock(ObjectMapper.class));
+        String sessionId = UUID.randomUUID().toString();
+        when(jdbcTemplate.query(contains("WHERE user_id = ? AND session_id = ?"), any(RowMapper.class), eq(7L), eq(sessionId)))
+                .thenReturn(List.of());
+
+        assertThrows(com.medcare.hda.exception.BusinessException.class,
+                () -> repository.deleteSession(7L, sessionId));
+    }
 
     @Test
     @SuppressWarnings({"rawtypes", "unchecked"})
