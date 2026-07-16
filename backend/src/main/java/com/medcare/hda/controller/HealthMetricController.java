@@ -18,6 +18,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 @Tag(name = "健康档案-体征/体检数据")
@@ -33,11 +34,13 @@ public class HealthMetricController {
     @Operation(summary = "分页查询(当前用户)")
     @GetMapping("/page")
     public Result<PageResult<HealthMetric>> page(@RequestParam(defaultValue = "1") long pageNum,
-                                              @RequestParam(defaultValue = "10") long pageSize) {
+                                              @RequestParam(defaultValue = "10") long pageSize,
+                                              @RequestParam(required = false) String metricType) {
         Long userId = SecurityUtil.getUserId();
         IPage<HealthMetric> page = service.page(new Page<>(pageNum, pageSize),
                 Wrappers.<HealthMetric>lambdaQuery()
                         .eq(HealthMetric::getUserId, userId)
+                        .eq(StringUtils.hasText(metricType), HealthMetric::getMetricType, metricType)
                         .orderByDesc(HealthMetric::getMeasureTime));
         // 展示时按最新阈值规则实时复判（不落库），保证规则上线前的历史数据也能正确标注异常
         page.getRecords().forEach(MetricRules::apply);
