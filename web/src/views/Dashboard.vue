@@ -203,7 +203,7 @@ const stats = computed(() => [
 ])
 
 const quicks = computed(() => [
-  { name: '健康档案', path: '/health/profile', icon: ICONS.book,    color: '#2E6FE0', span: 'c2', anim: 'a-book',
+  { name: '健康档案', path: '/health/profile', icon: ICONS.book,    color: '#2E6FE0', span: 'c1', anim: 'a-book',
     desc: '基本信息、既往病史与健康标签集中归档' },
   { name: '健康时间轴', path: '/health/timeline', icon: ICONS.activity, color: '#37B6D9', span: 'c1', anim: 'a-line',
     desc: '按时间串联体征、预警、报告和咨询闭环' },
@@ -215,7 +215,7 @@ const quicks = computed(() => [
     desc: '按科室与职称检索签约医生专家' },
   { name: '健康咨询', path: '/consult',        icon: ICONS.message, color: '#2E6FE0', span: 'c1', anim: '',
     desc: 'AI 健康助手 7×24 小时即时应答' },
-  { name: '健康预警', path: '/alert',          icon: ICONS.bell,    color: '#5D7189', span: 'c2', anim: 'a-bell',
+  { name: '健康预警', path: '/alert',          icon: ICONS.bell,    color: '#5D7189', span: 'c1', anim: 'a-bell',
     desc: raw.alert > 0 ? `${raw.alert} 条预警待处理，建议尽快查看` : '暂无未处理预警，各项指标平稳' },
 ])
 
@@ -665,14 +665,14 @@ onBeforeUnmount(() => {
 
 /* ============ bento 快捷入口 ============ */
 .sec-title { margin: 0 0 16px; font-size: 22px; color: var(--hda-ink); }
-.bento { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.bento { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: stretch; }
 .tile {
-  position: relative; display: flex; align-items: center; gap: 16px;
-  min-height: 96px; padding: 24px; cursor: pointer;
+  position: relative; display: grid; grid-template-columns: 36px minmax(0, 1fr) 18px; align-items: center; gap: 16px;
+  min-height: 116px; height: 100%; padding: 24px; cursor: pointer;
   transition: transform 0.4s var(--ease), box-shadow 0.4s var(--ease);
   will-change: transform;
 }
-.tile.c2 { grid-column: span 2; }
+.tile.c2 { grid-column: span 1; }
 .tile.c1 { grid-column: span 1; }
 .tile:hover { transform: translateY(-4px); }
 .tile:focus-visible { outline: 3px solid var(--el-color-primary-light-7); outline-offset: 2px; }
@@ -693,12 +693,12 @@ onBeforeUnmount(() => {
 .tile:hover .bd::before { animation: bdspin 1.2s linear 1; }
 @keyframes bdspin { to { transform: translate(-50%, -50%) rotate(360deg); } }
 
-.t-ic { flex: 0 0 30px; display: grid; place-items: center; width: 30px; height: 30px; }
+.t-ic { display: grid; place-items: center; width: 30px; height: 30px; }
 .t-ic :deep(svg) { width: 30px; height: 30px; overflow: visible; }
 .t-txt { min-width: 0; }
 .t-name { font-size: 18px; font-weight: 700; color: var(--hda-ink); }
 .t-desc { margin-top: 4px; font-size: 15px; color: var(--gray); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.t-arr { margin-left: auto; flex: 0 0 18px; width: 18px; height: 18px; color: #b3c0d0; transition: transform 0.4s var(--ease), color 0.4s var(--ease); }
+.t-arr { width: 18px; height: 18px; color: #b3c0d0; transition: transform 0.4s var(--ease), color 0.4s var(--ease); }
 .t-arr :deep(svg) { width: 18px; height: 18px; }
 .tile:hover .t-arr { transform: translateX(4px); color: var(--blue); }
 
@@ -723,7 +723,7 @@ onBeforeUnmount(() => {
 @media (max-width: 1100px) {
   .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .bento { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .tile.c2 { grid-column: span 2; }
+  .tile.c2 { grid-column: span 1; }
   .hero-ecg { display: none; }
   .hero { padding: 32px 24px; }
   .situation { grid-template-columns: 220px 1fr; }

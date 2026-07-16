@@ -15,7 +15,7 @@ spring:
     url: jdbc:mysql://localhost:3306/hda_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
     # 生产环境用环境变量覆盖，勿把真实密码提交进仓库
     username: ${DB_USERNAME:root}
-    password: ${DB_PASSWORD:123456}
+    password: ${DB_PASSWORD:zb2733286389}
   data:
     redis:
       host: localhost
@@ -33,7 +33,9 @@ spring:
     dashscope:
 
       # 必须由环境变量注入；仓库中不得保留任何默认密钥。
-      api-key: ${ALIYUN_APIKEY:sk-85022cabc74b4c6ea22b67b723c346ec}
+
+      api-key: ${ALIYUN_APIKEY:sk-ws-H.EDRRLIM.7fbe.MEUCIEOULNLqL85HW8tVyZmn9iqEKyz7ILT2lvxp05oOUpQZAiEAxd_6a1ncQ15ao2v4FLnEepj0rKMFiNgYlhKjx91QlwE}
+
 
       chat:
         options:
