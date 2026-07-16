@@ -4,7 +4,7 @@
     <el-card class="trend-card">
       <div class="trend-head">
         <h3>体征趋势</h3>
-        <el-radio-group v-model="trendType" @change="buildTrend">
+        <el-radio-group v-model="trendType" @change="onTrendTypeChange">
           <el-radio-button v-for="t in types" :key="t.value" :value="t.value">{{ t.label }}</el-radio-button>
         </el-radio-group>
       </div>
@@ -91,6 +91,7 @@
         </el-table-column>
       </el-table>
       <el-pagination style="margin-top:15px" layout="prev, pager, next" :total="total"
+                     v-model:current-page="query.pageNum"
                      :page-size="query.pageSize" @current-change="onPage" />
 
       <el-dialog v-model="dialog" :title="form.id ? '编辑' : '新增'" width="500px" append-to-body>
@@ -149,10 +150,11 @@ const trend = ref({ points: [], path1: '', path2: null, area: '', ticks: [], xLa
 const chartBox = ref(null), lineRef = ref(null), line2Ref = ref(null), areaRef = ref(null), lastRef = ref(null)
 
 async function load() {
-  const res = await pageMetric(query.value)
+  const params = { ...query.value, metricType: trendType.value }
+  const res = await pageMetric(params)
   list.value = res.data.records
   total.value = res.data.total
-  const all = await pageMetric({ pageNum: 1, pageSize: 100 })
+  const all = await pageMetric({ pageNum: 1, pageSize: 100, metricType: trendType.value })
   allRecords.value = all.data.records || []
   buildTrend()
 }
@@ -255,9 +257,14 @@ function fillUnit() {
   form.value.unit = types.find(t => t.value === form.value.metricType)?.unit || ''
   if (form.value.metricType !== 'BLOOD_PRESSURE') form.value.metricValue2 = null
 }
+function onTrendTypeChange() {
+  query.value.pageNum = 1
+  load()
+}
 function onPage(p) { query.value.pageNum = p; load() }
 function openDialog(row) {
-  form.value = row ? { ...row } : { metricType: 'BLOOD_PRESSURE', unit: 'mmHg' }
+  const currentType = types.find(t => t.value === trendType.value) || types[0]
+  form.value = row ? { ...row } : { metricType: currentType.value, unit: currentType.unit }
   dialog.value = true
 }
 async function save() {

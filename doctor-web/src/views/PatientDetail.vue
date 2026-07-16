@@ -37,8 +37,8 @@
         <el-card>
           <template #header><div class="card-title"><el-icon><DataLine /></el-icon><span>近期体征</span><small>最近 10 条</small></div></template>
           <el-table :data="detail.metrics || []" height="286">
-            <el-table-column prop="metricType" label="类型" min-width="110" />
-            <el-table-column label="数值" min-width="110"><template #default="{ row }"><b class="metric-value">{{ row.metricValue }} {{ row.unit || '' }}</b></template></el-table-column>
+            <el-table-column label="类型" min-width="110"><template #default="{ row }">{{ metricTypeText(row.metricType) }}</template></el-table-column>
+            <el-table-column label="数值" min-width="110"><template #default="{ row }"><b class="metric-value">{{ metricValueText(row) }}</b></template></el-table-column>
             <el-table-column prop="measureTime" label="测量时间" min-width="170" />
             <template #empty><el-empty description="暂无体征数据" :image-size="64" /></template>
           </el-table>
@@ -105,6 +105,23 @@ function genderText(value) { return value === 1 ? '男' : value === 2 ? '女' : 
 function valueWithUnit(value, unit) { return value === null || value === undefined ? '未填写' : `${value} ${unit}` }
 function alertType(level) { return level === 'HIGH' ? 'danger' : level === 'MEDIUM' ? 'warning' : 'info' }
 function levelText(level) { return { HIGH: '高风险', MEDIUM: '中风险', LOW: '低风险' }[level] || level || '未知' }
+function metricTypeText(type) {
+  return {
+    BLOOD_PRESSURE: '血压',
+    BLOOD_SUGAR: '血糖',
+    HEART_RATE: '心率',
+    TEMPERATURE: '体温',
+    WEIGHT: '体重'
+  }[type] || type || '未知'
+}
+function metricValueText(row) {
+  if (!row) return ''
+  const unit = row.unit || ''
+  if (row.metricType === 'BLOOD_PRESSURE' && row.metricValue2 !== null && row.metricValue2 !== undefined) {
+    return `${row.metricValue}/${row.metricValue2} ${unit}`.trim()
+  }
+  return `${row.metricValue ?? ''} ${unit}`.trim()
+}
 
 onMounted(async () => {
   try { detail.value = (await getPatientDetail(route.params.id)).data || {} }
