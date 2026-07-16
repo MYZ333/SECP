@@ -57,6 +57,11 @@ public class HealthAssistantAgentService {
         return conversationRepository.resolve(userId, sessionId);
     }
 
+    public void deleteConversation(Long userId, String sessionId) {
+        String conversationId = conversationRepository.deleteSession(userId, sessionId);
+        healthAssistantChatMemory.clear(conversationId);
+    }
+
     public AgentChatResponse chat(Long userId, AgentConversation conversation, String message, boolean useHealthProfile) {
         Execution execution = execute(userId, conversation, message, useHealthProfile);
         PreparedAgentResponse prepared = execution.prepared();
@@ -93,7 +98,7 @@ public class HealthAssistantAgentService {
         }
 
         StreamingSafetyWindow safetyWindow = new StreamingSafetyWindow(outputSafetyService, prepared.risk(),
-                shouldOfferDoctorRecommendation(prepared));
+                shouldOfferDoctorRecommendation(prepared), shouldApplyMedicalSuffix(prepared));
         Flux<AgentStreamEvent> modelDeltas = healthAssistantChatClient.prompt()
                 .system(withLongTermMemory(userId, message, prepared.systemPrompt()))
                 .messages(healthAssistantChatMemory.get(conversation.conversationId()))
@@ -203,7 +208,9 @@ public class HealthAssistantAgentService {
     }
 
     private void completeIntakeIfFinished(Long userId, String sessionId, PreparedAgentResponse prepared) {
-        if (!"CLARIFICATION".equals(prepared.route())) intakeStateRepository.complete(userId, sessionId);
+        if (!"CLARIFICATION".equals(prepared.route()) && !"MEMORY_RECALL".equals(prepared.route())) {
+            intakeStateRepository.complete(userId, sessionId);
+        }
     }
 
     private String addDoctorRecommendationOffer(String content, PreparedAgentResponse prepared) {
@@ -212,9 +219,14 @@ public class HealthAssistantAgentService {
     }
 
     private String enforceOutput(String content, PreparedAgentResponse prepared) {
+        if (!shouldApplyMedicalSuffix(prepared)) return outputSafetyService.sanitizeDiagnosisLanguage(content == null ? "" : content.trim());
         return "CLARIFICATION".equals(prepared.route())
                 ? outputSafetyService.enforceClarification(content)
                 : outputSafetyService.enforce(content, prepared.risk());
+    }
+
+    private boolean shouldApplyMedicalSuffix(PreparedAgentResponse prepared) {
+        return !"MEMORY_RECALL".equals(prepared.route());
     }
 
     private boolean shouldOfferDoctorRecommendation(PreparedAgentResponse prepared) {
@@ -247,14 +259,16 @@ public class HealthAssistantAgentService {
         private final OutputSafetyService safetyService;
         private final RiskAssessment risk;
         private final boolean offerDoctorRecommendation;
+        private final boolean applyMedicalSuffix;
         private final StringBuilder pending = new StringBuilder();
         private final StringBuilder emitted = new StringBuilder();
 
         private StreamingSafetyWindow(OutputSafetyService safetyService, RiskAssessment risk,
-                                      boolean offerDoctorRecommendation) {
+                                      boolean offerDoctorRecommendation, boolean applyMedicalSuffix) {
             this.safetyService = safetyService;
             this.risk = risk;
             this.offerDoctorRecommendation = offerDoctorRecommendation;
+            this.applyMedicalSuffix = applyMedicalSuffix;
         }
 
         private String accept(String token) {
@@ -274,7 +288,7 @@ public class HealthAssistantAgentService {
             String tail = safetyService.sanitizeDiagnosisLanguage(pending.toString());
             pending.setLength(0);
             String current = emitted + tail;
-            String suffix = safetyService.completionSuffix(current, risk);
+            String suffix = applyMedicalSuffix ? safetyService.completionSuffix(current, risk) : "";
             String offer = offerDoctorRecommendation && !current.contains("匹配平台内已审核的真实医生")
                     ? DOCTOR_RECOMMENDATION_OFFER : "";
             String finalDelta = tail + suffix + offer;

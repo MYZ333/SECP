@@ -98,6 +98,13 @@ public class HealthAgentOrchestrator {
                     "SAFETY_SHORT_CIRCUIT", null, emergencyAnswer(risk), null);
         }
 
+        if (isMemoryRecallIntent(message)) {
+            auditRepository.route(traceId, "MEMORY_RECALL", risk.level());
+            report(stages, stageReporter, AgentStageUpdate.completed("ROUTING", "正在查找与问题相关的长期记忆"));
+            return new PreparedAgentResponse(traceId, risk, List.of(), List.of(), stages, List.of(),
+                    "MEMORY_RECALL", memoryRecallPrompt(), null, null);
+        }
+
         report(stages, stageReporter, AgentStageUpdate.running("CLARIFYING", "正在判断现有信息是否足以提供安全建议"));
         ClinicalIntakeAssessment intake = acceptedDoctorOffer && recommendationContext != null
                 ? acceptedDoctorOffer(recommendationContext)
@@ -288,5 +295,26 @@ public class HealthAgentOrchestrator {
 
     private String emergencyAnswer(RiskAssessment risk) {
         return "【请立即处理】\n" + risk.message() + "\n\n在等待急救时请尽量保持安全、避免自行驾车；如身边有人，请请其陪同并准备告知症状开始时间、既往疾病和正在使用的药物。";
+    }
+
+    static boolean isMemoryRecallIntent(String message) {
+        if (message == null || message.isBlank()) return false;
+        String text = message.replaceAll("[\\s，,。.!！?？]", "");
+        return text.contains("你还记得")
+                || text.contains("还记得我")
+                || text.contains("我之前说过")
+                || text.contains("我以前说过")
+                || text.contains("我曾经说过")
+                || text.contains("根据你记得的")
+                || text.contains("根据我的长期记忆");
+    }
+
+    private String memoryRecallPrompt() {
+        return """
+                你正在回答用户对其本人长期记忆的查询。此类查询属于健康助手允许处理的个性化上下文，不要因为内容并非医疗问题而拒绝回答。
+                只能依据随后提供的【用户长期记忆】作答，不得猜测、补全或把健康档案中的信息混入答案。
+                如果长期记忆中有答案，直接、简短地回答；如果没有相关记录，坦率说明目前没有记住这项信息，并请用户重新告诉你。
+                不要输出健康建议、就医提示、风险分析、固定医疗免责声明或医生推荐。
+                """;
     }
 }

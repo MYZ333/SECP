@@ -33,7 +33,9 @@ spring:
     dashscope:
 
       # 必须由环境变量注入；仓库中不得保留任何默认密钥。
+
       api-key: ${ALIYUN_APIKEY:sk-ws-H.EDRRLIM.7fbe.MEUCIEOULNLqL85HW8tVyZmn9iqEKyz7ILT2lvxp05oOUpQZAiEAxd_6a1ncQ15ao2v4FLnEepj0rKMFiNgYlhKjx91QlwE}
+
 
       chat:
         options:

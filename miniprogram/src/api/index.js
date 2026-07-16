@@ -51,6 +51,7 @@ export const pageDoctors = (p) => request({ url: '/doctor/page' + qs(p) })
 // AI 健康咨询
 export const consultChat = (data) => request({ url: '/consult/chat', method: 'POST', data })
 export const consultHistory = (p) => request({ url: '/consult/history' + qs(p) })
+export const deleteConsultSession = (sessionId) => request({ url: `/consult/sessions/${sessionId}`, method: 'DELETE' })
 
 // 健康预警
 export const pageAlerts = (p) => request({ url: '/alert/page' + qs(p) })

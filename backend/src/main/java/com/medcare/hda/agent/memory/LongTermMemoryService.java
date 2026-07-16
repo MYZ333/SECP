@@ -131,13 +131,13 @@ public class LongTermMemoryService {
     public List<MemoryView> search(Long userId, String query, MemorySourceAgent consumer, int topK) {
         if (!enabled || !StringUtils.hasText(query)) return List.of();
         VectorStore store = vectorStoreProvider.getIfAvailable();
-        if (store == null) return List.of();
+        if (store == null) return recentMemories(userId, consumer, topK);
         String filter = "userId == '" + userId + "'";
         if (consumer == MemorySourceAgent.APPLICATION) filter += " && visibility == 'SHARED'";
         try {
             List<Document> documents = store.similaritySearch(SearchRequest.builder().query(query)
                     .topK(Math.min(50, Math.max(1, topK))).filterExpression(filter).build());
-            if (documents == null || documents.isEmpty()) return List.of();
+            if (documents == null || documents.isEmpty()) return recentMemories(userId, consumer, topK);
             List<String> ids = documents.stream().map(document -> String.valueOf(document.getMetadata().get("memoryId"))).toList();
             Map<String, MemoryView> active = loadByIds(userId, ids);
             return ids.stream().map(active::get).filter(java.util.Objects::nonNull)
@@ -145,8 +145,21 @@ public class LongTermMemoryService {
                     .limit(topK).toList();
         } catch (Exception error) {
             log.warn("Long-term memory search degraded: {}", error.getMessage());
-            return List.of();
+            return recentMemories(userId, consumer, topK);
         }
+    }
+
+    private List<MemoryView> recentMemories(Long userId, MemorySourceAgent consumer, int topK) {
+        String visibilityClause = consumer == MemorySourceAgent.APPLICATION
+                ? " AND visibility='SHARED'" : "";
+        return jdbcTemplate.query("""
+                        SELECT * FROM long_term_memory
+                        WHERE user_id=? AND deleted=0
+                        """ + visibilityClause + " ORDER BY update_time DESC LIMIT ?",
+                (rs, rowNum) -> mapView(rs.getString("memory_id"), rs.getString("content"),
+                        rs.getString("category"), rs.getString("visibility"), rs.getString("source_agent"),
+                        rs.getDouble("confidence"), rs.getInt("version_no"), rs.getTimestamp("create_time"),
+                        rs.getTimestamp("update_time")), userId, Math.min(50, Math.max(1, topK)));
     }
 
     public MemoryView create(Long userId, MemoryCreateRequest request) {

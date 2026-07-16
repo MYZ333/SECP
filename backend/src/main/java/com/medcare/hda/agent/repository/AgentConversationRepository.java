@@ -98,15 +98,47 @@ public class AgentConversationRepository {
                 userId, MAX_SESSIONS_PER_USER);
 
         for (SessionStorage session : expired) {
-            jdbcTemplate.update("DELETE FROM agent_consult_state WHERE user_id = ? AND session_id = ?",
-                    userId, session.sessionId());
-            jdbcTemplate.update("DELETE FROM agent_chat_turn WHERE user_id = ? AND session_id = ?",
-                    userId, session.sessionId());
-            jdbcTemplate.update("DELETE FROM SPRING_AI_CHAT_MEMORY WHERE conversation_id = ?",
-                    session.conversationId());
-            jdbcTemplate.update("DELETE FROM agent_chat_session WHERE user_id = ? AND session_id = ?",
-                    userId, session.sessionId());
+            deleteSessionStorage(userId, session);
         }
+    }
+
+    @Transactional
+    public String deleteSession(Long userId, String sessionId) {
+        validateSessionId(sessionId);
+        List<SessionStorage> sessions = jdbcTemplate.query("""
+                        SELECT session_id, conversation_id
+                        FROM agent_chat_session
+                        WHERE user_id = ? AND session_id = ?
+                        """,
+                (rs, rowNum) -> new SessionStorage(rs.getString("session_id"), rs.getString("conversation_id")),
+                userId, sessionId);
+        if (sessions.isEmpty()) {
+            throw new BusinessException(ResultCode.NOT_FOUND.getCode(), "对话不存在或已被删除");
+        }
+        SessionStorage session = sessions.getFirst();
+        deleteSessionStorage(userId, session);
+        return session.conversationId();
+    }
+
+    private void deleteSessionStorage(Long userId, SessionStorage session) {
+        jdbcTemplate.update("""
+                DELETE FROM agent_run_step
+                WHERE trace_id IN (
+                    SELECT trace_id FROM agent_run WHERE user_id = ? AND session_id = ?
+                )
+                """, userId, session.sessionId());
+        jdbcTemplate.update("DELETE FROM agent_run WHERE user_id = ? AND session_id = ?",
+                userId, session.sessionId());
+        jdbcTemplate.update("DELETE FROM agent_consult_state WHERE user_id = ? AND session_id = ?",
+                userId, session.sessionId());
+        jdbcTemplate.update("DELETE FROM agent_chat_turn WHERE user_id = ? AND session_id = ?",
+                userId, session.sessionId());
+        jdbcTemplate.update("DELETE FROM long_term_memory_job WHERE user_id = ? AND source_session_id = ?",
+                userId, session.sessionId());
+        jdbcTemplate.update("DELETE FROM SPRING_AI_CHAT_MEMORY WHERE conversation_id = ?",
+                session.conversationId());
+        jdbcTemplate.update("DELETE FROM agent_chat_session WHERE user_id = ? AND session_id = ?",
+                userId, session.sessionId());
     }
 
     public PageResult<AgentHistoryMessage> pageHistory(Long userId, String sessionId, long pageNum, long pageSize) {
